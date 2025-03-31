@@ -14,7 +14,7 @@ from src.create_test_pointcloud import create_test_pointcloud
 from src.algorithms.gerchberg_saxton import holographic_phase_retrieval
 from src.simulation_config_real_data import SimulationConfig
 from src.utils.field_utils import compute_fields, reconstruct_field
-from src.visualization import visualize_fields
+from src.visualization.field_plots import visualize_fields
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
