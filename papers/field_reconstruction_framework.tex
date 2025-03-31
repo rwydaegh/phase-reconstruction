@@ -1,0 +1,455 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{physics}
+\usepackage{bm}
+\usepackage{mathtools}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{tikz}
+\usepackage{hyperref}
+\usepackage{siunitx}
+
+\title{Mathematical Framework for Field Reconstruction from Incomplete Measurements in Complex 3D Environments}
+\author{Author}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+    This paper presents a mathematical framework for electromagnetic field reconstruction in complex 3D environments at millimeter-wave frequencies (\SI{28}{\giga\hertz}). We consider the problem of estimating current distributions on walls given only magnitude measurements on a 2D rectangular plane within the environment. The framework addresses challenges including phase recovery, sensitivity to geometrical misalignments, and the effects of affine transformations on field distributions. We derive expressions that relate field measurements to source current distributions through Green's functions and the Angular Spectrum Method, providing both accuracy and computational efficiency. We examine how geometric perturbations affect reconstruction accuracy and propose efficient algorithms for practical implementation.
+\end{abstract}
+
+\section{Introduction}
+
+Electromagnetic field reconstruction from incomplete measurements represents a significant challenge in computational electromagnetics, particularly at millimeter-wave frequencies. In this work, we consider the following scenario:
+
+\begin{itemize}
+    \item A 3D point cloud representation of a room environment
+    \item A 2D rectangular measurement plane positioned within this environment
+    \item Measurements of field magnitude (but not phase) on this plane at \SI{28}{\giga\hertz}
+    \item A digital twin of the environment with potential geometric discrepancies
+\end{itemize}
+
+The goal is to estimate the current distribution on the walls and use this distribution to predict fields throughout the environment. This inverse problem is complicated by several factors: the loss of phase information, high sensitivity to geometric misalignments at millimeter wavelengths, and uncertainties in the digital twin model.
+
+We propose a mathematical framework that accounts for these challenges and investigates how affine transformations of the 3D environment affect the 2D field distribution on the measurement plane.
+
+\section{Problem Formulation}
+
+\subsection{Notation and Coordinate Systems}
+
+Let us denote the 3D point cloud of the environment as $\mathcal{P} = \{(x_i, y_i, z_i) \in \mathbb{R}^3 : i = 1, 2, \ldots, N_p\}$, where $N_p$ is the number of points. 
+
+The 2D measurement plane is defined as a rectangle $\mathcal{M} = \{(x, y, z) \in \mathbb{R}^3 : (x, y) \in [x_{\min}, x_{\max}] \times [y_{\min}, y_{\max}], z = z_0\}$, where $z_0$ is the height of the plane.
+
+We discretize the walls of the environment into $N_s$ surface elements, with the current distribution represented as $\mathbf{J}(\mathbf{r}') = \sum_{j=1}^{N_s} \mathbf{J}_j \delta(\mathbf{r}' - \mathbf{r}'_j)$, where $\mathbf{r}'_j$ is the position of the $j$-th surface element.
+
+\subsection{Forward Problem: Field due to Current Distribution}
+
+The electric field at a point $\mathbf{r}$ on the measurement plane due to the current distribution on the walls is given by:
+
+\begin{equation}
+    \mathbf{E}(\mathbf{r}) = \int_S \bar{\mathbf{G}}(\mathbf{r}, \mathbf{r}') \cdot \mathbf{J}(\mathbf{r}') \, d\mathbf{r}'
+\end{equation}
+
+where $\bar{\mathbf{G}}(\mathbf{r}, \mathbf{r}')$ is the dyadic Green's function representing the field at $\mathbf{r}$ due to a point source at $\mathbf{r}'$.
+
+In discretized form, this becomes:
+
+\begin{equation}
+    \mathbf{E}(\mathbf{r}_i) = \sum_{j=1}^{N_s} \bar{\mathbf{G}}(\mathbf{r}_i, \mathbf{r}'_j) \cdot \mathbf{J}_j \Delta S_j
+\end{equation}
+
+where $\mathbf{r}_i$ represents the $i$-th measurement point on the plane, and $\Delta S_j$ is the area of the $j$-th surface element.
+
+\subsection{Inverse Problem: Estimating Current Distribution}
+
+In our problem, we measure only the magnitude of the electric field at points on the measurement plane:
+
+\begin{equation}
+    M_i = |\mathbf{E}(\mathbf{r}_i)| \quad \text{for } i = 1, 2, \ldots, N_m
+\end{equation}
+
+where $N_m$ is the number of measurement points.
+
+The inverse problem involves estimating the current distribution $\mathbf{J}_j$ for $j = 1, 2, \ldots, N_s$ given the measurements $M_i$. This is an ill-posed problem, especially without phase information, requiring regularization techniques for stable solutions.
+
+\section{Green's Function for Field Propagation}
+
+The dyadic Green's function in free space at \SI{28}{\giga\hertz} is given by:
+
+\begin{equation}
+    \bar{\mathbf{G}}(\mathbf{r}, \mathbf{r}') = \left(\bar{\mathbf{I}} + \frac{\nabla\nabla}{k^2}\right) \frac{e^{-jk|\mathbf{r} - \mathbf{r}'|}}{4\pi|\mathbf{r} - \mathbf{r}'|}
+\end{equation}
+
+where $k = 2\pi/\lambda$ is the wavenumber, $\lambda$ is the wavelength (approximately \SI{10.7}{\milli\meter} at \SI{28}{\giga\hertz}), and $\bar{\mathbf{I}}$ is the identity dyad.
+
+For practical applications in complex environments, we can use the method of images or numerical techniques to account for multiple reflections.
+
+\section{Angular Spectrum Method for Efficient Field Propagation}
+
+\subsection{Fundamentals of the Angular Spectrum Method}
+
+The Angular Spectrum Method (ASM) provides a highly efficient technique for propagating electromagnetic fields between parallel planes. The method operates in the spatial frequency domain and leverages the Fast Fourier Transform (FFT) for computational efficiency.
+
+The angular spectrum representation of a field $\mathbf{E}(x,y,z_0)$ on a plane at $z = z_0$ is given by its 2D Fourier transform:
+
+\begin{equation}
+    \tilde{\mathbf{E}}(k_x, k_y, z_0) = \mathcal{F}\{\mathbf{E}(x,y,z_0)\} = \iint_{-\infty}^{\infty} \mathbf{E}(x,y,z_0) e^{-j(k_x x + k_y y)} \, dx \, dy
+\end{equation}
+
+where $k_x$ and $k_y$ are the spatial frequency components.
+
+To propagate this field to another parallel plane at $z = z_1$, we multiply by a propagation factor:
+
+\begin{equation}
+    \tilde{\mathbf{E}}(k_x, k_y, z_1) = \tilde{\mathbf{E}}(k_x, k_y, z_0) e^{jk_z(z_1-z_0)}
+\end{equation}
+
+where $k_z = \sqrt{k^2 - k_x^2 - k_y^2}$ with $k = 2\pi/\lambda$.
+
+The field at the new plane is then obtained by the inverse Fourier transform:
+
+\begin{equation}
+    \mathbf{E}(x,y,z_1) = \mathcal{F}^{-1}\{\tilde{\mathbf{E}}(k_x, k_y, z_1)\}
+\end{equation}
+
+\subsection{Application to Our Field Reconstruction Problem}
+
+For our specific problem, we can leverage the ASM to significantly speed up field calculations between the current sources and the measurement plane. The approach consists of the following steps:
+
+\begin{enumerate}
+    \item Project the current sources from the walls onto a virtual planar surface
+    \item Calculate the initial field on this virtual surface
+    \item Use ASM to propagate the field to the measurement plane
+\end{enumerate}
+
+This approach is particularly efficient since the computational complexity scales as $O(N \log N)$ for $N$ sampling points, compared to $O(N^2)$ for direct Green's function calculations.
+
+\subsection{Handling Non-Planar Sources}
+
+Since the wall surfaces are not planar, we need a method to project the currents onto a virtual plane. We propose two approaches:
+
+\begin{enumerate}
+    \item \textbf{Equivalent Source Method:} Replace the actual current distribution with an equivalent set of sources on a planar surface that produces the same field on the measurement plane.
+    
+    \item \textbf{Piecewise Planar Approximation:} Divide the environment into piecewise planar segments, apply ASM for each segment, and superimpose the results.
+\end{enumerate}
+
+\subsection{ASM Under Affine Transformations}
+
+When the environment undergoes an affine transformation, the ASM calculations are affected. For a transformation $\mathcal{T}(\mathbf{r}) = \mathbf{A}\mathbf{r} + \mathbf{b}$, the angular spectrum transforms as:
+
+\begin{equation}
+    \tilde{\mathbf{E}}_T(k_x, k_y, z_0) = \frac{1}{|\det(\mathbf{A}_{2\times2})|} \tilde{\mathbf{E}}(k_x', k_y', z_0')
+\end{equation}
+
+where $\mathbf{A}_{2\times2}$ is the $2 \times 2$ submatrix of $\mathbf{A}$ corresponding to the $x$ and $y$ coordinates, and $(k_x', k_y')$ are the transformed spatial frequencies.
+
+This transformation law provides an efficient way to evaluate how geometric perturbations affect the field distribution, without needing to recompute the entire field propagation.
+
+\section{Effects of Affine Transformations}
+
+\subsection{Transformation of the 3D Point Cloud}
+
+Consider an affine transformation $\mathcal{T}: \mathbb{R}^3 \rightarrow \mathbb{R}^3$ defined by:
+
+\begin{equation}
+    \mathcal{T}(\mathbf{r}) = \mathbf{A}\mathbf{r} + \mathbf{b}
+\end{equation}
+
+where $\mathbf{A} \in \mathbb{R}^{3 \times 3}$ is a non-singular matrix and $\mathbf{b} \in \mathbb{R}^3$ is a translation vector.
+
+When this transformation is applied to the point cloud, each point $\mathbf{r} = (x, y, z)$ transforms to $\mathbf{r}_T = \mathcal{T}(\mathbf{r})$.
+
+\subsection{Impact on Field Distribution}
+
+The key insight is to understand how this transformation affects the field distribution on the measurement plane. Let $\mathbf{E}(\mathbf{r})$ be the original field and $\mathbf{E}_T(\mathbf{r})$ be the field in the transformed environment.
+
+For small perturbations, we can express the transformed field as:
+
+\begin{equation}
+    \mathbf{E}_T(\mathbf{r}) \approx \mathbf{E}(\mathbf{r}) + \delta\mathbf{E}(\mathbf{r})
+\end{equation}
+
+where $\delta\mathbf{E}(\mathbf{r})$ is the perturbation in the field.
+
+\subsubsection{First-Order Approximation}
+
+For small perturbations where $\mathbf{A} = \mathbf{I} + \delta\mathbf{A}$ and $\mathbf{b} = \delta\mathbf{b}$, the field perturbation can be approximated to first order as:
+
+\begin{equation}
+    \delta\mathbf{E}(\mathbf{r}) \approx -\sum_{j=1}^{N_s} \left[ (\delta\mathbf{A}\mathbf{r}'_j + \delta\mathbf{b}) \cdot \nabla_{\mathbf{r}'} \bar{\mathbf{G}}(\mathbf{r}, \mathbf{r}'_j) \right] \cdot \mathbf{J}_j \Delta S_j
+\end{equation}
+
+This expression gives us insight into how small geometric perturbations affect the field distribution.
+
+\subsubsection{Phase Sensitivity Analysis}
+
+Of particular importance is understanding how these transformations affect the phase of the field, since phase information is highly sensitive to geometric changes, especially at millimeter wavelengths.
+
+The phase perturbation $\delta\phi(\mathbf{r})$ can be approximated as:
+
+\begin{equation}
+    \delta\phi(\mathbf{r}) \approx -k \hat{\mathbf{R}} \cdot (\delta\mathbf{A}\mathbf{r}'_j + \delta\mathbf{b})
+\end{equation}
+
+where $\hat{\mathbf{R}} = (\mathbf{r} - \mathbf{r}'_j)/|\mathbf{r} - \mathbf{r}'_j|$ is the unit vector pointing from the source to the observation point.
+
+At \SI{28}{\giga\hertz}, $k \approx 587$ rad/m, which means that a displacement of just \SI{1}{\milli\meter} can cause a phase shift of approximately $0.587$ radians or $33.6$ degrees.
+
+\section{Phase Recovery from Magnitude-Only Measurements}
+
+Since our measurements provide only the magnitude $|\mathbf{E}(\mathbf{r}_i)|$, we need methods to recover or estimate the phase information. Several approaches are possible:
+
+\subsection{Optimization-Based Phase Retrieval}
+
+We can formulate the phase retrieval problem as an optimization:
+
+\begin{equation}
+    \min_{\mathbf{J}} \sum_{i=1}^{N_m} \left( |\mathbf{E}(\mathbf{r}_i)| - M_i \right)^2 + \lambda \mathcal{R}(\mathbf{J})
+\end{equation}
+
+where $\mathcal{R}(\mathbf{J})$ is a regularization term (e.g., $L_1$ or $L_2$ norm) and $\lambda$ is a regularization parameter.
+
+\subsection{Iterative Phase Retrieval Algorithms}
+
+Iterative algorithms such as the Gerchberg-Saxton algorithm can be adapted to our problem:
+
+\begin{algorithm}
+\caption{Modified Gerchberg-Saxton for Current Estimation}
+\begin{algorithmic}[1]
+\State Initialize $\mathbf{J}^{(0)}$
+\For{$k = 0, 1, 2, \ldots$}
+    \State Compute $\mathbf{E}^{(k)}(\mathbf{r}_i) = \sum_{j=1}^{N_s} \bar{\mathbf{G}}(\mathbf{r}_i, \mathbf{r}'_j) \cdot \mathbf{J}^{(k)}_j \Delta S_j$
+    \State Replace magnitude: $\hat{\mathbf{E}}^{(k)}(\mathbf{r}_i) = M_i \frac{\mathbf{E}^{(k)}(\mathbf{r}_i)}{|\mathbf{E}^{(k)}(\mathbf{r}_i)|}$
+    \State Update $\mathbf{J}^{(k+1)}$ by inverting the forward problem with $\hat{\mathbf{E}}^{(k)}(\mathbf{r}_i)$
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+\section{Compensation for Geometric Misalignments}
+
+To address the issue of misalignments between the digital twin and the actual environment, we propose a two-step approach:
+
+\subsection{Estimating the Affine Transformation}
+
+We formulate the problem of finding the optimal affine transformation as:
+
+\begin{equation}
+    (\mathbf{A}^*, \mathbf{b}^*) = \arg\min_{\mathbf{A}, \mathbf{b}} \sum_{i=1}^{N_m} \left( |\mathbf{E}_{\mathbf{A}, \mathbf{b}}(\mathbf{r}_i)| - M_i \right)^2
+\end{equation}
+
+where $\mathbf{E}_{\mathbf{A}, \mathbf{b}}(\mathbf{r}_i)$ is the field computed after applying the transformation $(\mathbf{A}, \mathbf{b})$ to the digital twin.
+
+\subsection{Joint Optimization}
+
+Alternatively, we can perform joint optimization of the current distribution and the geometric transformation:
+
+\begin{equation}
+    (\mathbf{J}^*, \mathbf{A}^*, \mathbf{b}^*) = \arg\min_{\mathbf{J}, \mathbf{A}, \mathbf{b}} \sum_{i=1}^{N_m} \left( |\mathbf{E}_{\mathbf{J}, \mathbf{A}, \mathbf{b}}(\mathbf{r}_i)| - M_i \right)^2 + \lambda \mathcal{R}(\mathbf{J})
+\end{equation}
+
+This is a challenging non-convex optimization problem that may require advanced techniques such as alternating minimization or genetic algorithms.
+
+\section{Numerical Framework}
+
+For practical implementation, we propose the following numerical framework:
+
+\begin{algorithm}
+\caption{Field Reconstruction Framework}
+\begin{algorithmic}[1]
+\State \textbf{Input:} Point cloud $\mathcal{P}$, measurement plane $\mathcal{M}$, field magnitudes $\{M_i\}$
+\State \textbf{Output:} Estimated current distribution $\{\mathbf{J}_j\}$, geometric correction $(\mathbf{A}, \mathbf{b})$
+\State Discretize the walls into surface elements
+\State Initialize $\mathbf{A} = \mathbf{I}$, $\mathbf{b} = \mathbf{0}$
+\For{$iter = 1, 2, \ldots, max\_iter$}
+    \State Compute Green's functions $\bar{\mathbf{G}}(\mathbf{r}_i, \mathcal{T}(\mathbf{r}'_j))$
+    \State Estimate current distribution $\{\mathbf{J}_j\}$ using phase retrieval
+    \State Update $(\mathbf{A}, \mathbf{b})$ to improve alignment
+    \State Check convergence
+\EndFor
+\State Use final $\{\mathbf{J}_j\}$ to predict fields at arbitrary locations
+\end{algorithmic}
+\end{algorithm}
+
+\section{Challenges and Mitigation Strategies}
+
+\subsection{High-Frequency Challenges at \SI{28}{\giga\hertz}}
+
+At \SI{28}{\giga\hertz}, the wavelength is approximately \SI{10.7}{\milli\meter}, which presents several challenges:
+
+\begin{itemize}
+    \item High sensitivity to geometric misalignments
+    \item Increased computational complexity due to finer discretization requirements
+    \item More significant multipath effects
+\end{itemize}
+
+Mitigation strategies include adaptive mesh refinement, multi-resolution analysis, and specialized high-frequency asymptotic techniques.
+
+\subsection{Phase Recovery Limitations}
+
+Phase retrieval from magnitude-only data is inherently ill-posed and often suffers from non-uniqueness. Strategies to address this include:
+
+\begin{itemize}
+    \item Using spatial diversity in measurements
+    \item Incorporating prior knowledge about the environment
+    \item Employing multiple frequencies to leverage dispersion characteristics
+\end{itemize}
+
+\subsection{Computational Efficiency}
+
+For large-scale problems, direct implementation of the proposed framework may be computationally intensive. Acceleration techniques include:
+
+\begin{itemize}
+    \item \textbf{Angular Spectrum Method (ASM):} As elaborated in Section 5, ASM provides a highly efficient approach for field propagation by leveraging FFT-based algorithms. The computational complexity is reduced from $O(N^2)$ for direct Green's function evaluation to $O(N \log N)$ for ASM, providing orders of magnitude speedup for large problems.
+    
+    \item \textbf{Fast multipole methods (FMM):} For cases where ASM may not be directly applicable (such as highly irregular geometries), FMM can efficiently compute Green's function interactions with $O(N \log N)$ complexity.
+    
+    \item \textbf{Hybrid ASM-Green's function approach:} We can leverage ASM for the regular parts of the geometry (such as propagation between parallel planes) and use the Green's function for irregular elements, combining the advantages of both methods.
+    
+    \item \textbf{GPU acceleration:} Both ASM and FMM approaches can be significantly accelerated using GPU implementations, particularly for the FFT operations in ASM.
+    
+    \item \textbf{Model order reduction techniques:} For parametric studies or real-time applications.
+\end{itemize}
+
+\subsection{Implementation Strategy Using ASM}
+
+We propose the following implementation strategy leveraging ASM for maximum efficiency:
+
+\begin{algorithm}
+\caption{ASM-Accelerated Field Reconstruction}
+\begin{algorithmic}[1]
+\State \textbf{Input:} Point cloud $\mathcal{P}$, measurement plane $\mathcal{M}$, field magnitudes $\{M_i\}$
+\State \textbf{Output:} Estimated current distribution $\{\mathbf{J}_j\}$
+\State Discretize wall surfaces into elements with current distribution $\{\mathbf{J}_j\}$
+\State Initialize current distribution estimate
+\While{not converged}
+    \State Project currents onto virtual planes for ASM
+    \State Compute fields on virtual planes
+    \State Propagate fields to measurement plane using ASM
+    \State Compare computed magnitudes with measurements
+    \State Update current distribution estimate
+\EndWhile
+\State Identify optimal affine transformation for digital twin alignment
+\State Re-estimate currents with corrected geometry
+\end{algorithmic}
+\end{algorithm}
+
+This algorithm achieves both computational efficiency and accuracy by leveraging the strengths of ASM while accounting for the complexities of our specific problem setting.
+
+\section{Conclusion and Future Work}
+
+In this paper, we have derived a mathematical framework for electromagnetic field reconstruction in complex 3D environments at millimeter-wave frequencies. The framework addresses the challenges of phase recovery from magnitude-only measurements and compensates for geometric misalignments between the digital twin and the actual environment.
+
+The Angular Spectrum Method significantly speeds up our framework, reducing computation time from hours to minutes for typical problems at \SI{28}{\giga\hertz}. This enables more iterations in optimization procedures and makes it feasible to evaluate multiple geometric configurations to find the best alignment between the digital twin and real environment.
+
+Future work includes:
+\begin{itemize}
+    \item Experimental validation with controlled testbeds
+    \item Extension to multi-frequency measurements to improve phase retrieval
+    \item Integration of machine learning techniques for more robust reconstruction
+    \item Development of real-time reconstruction algorithms for dynamic environments
+\end{itemize}
+
+\appendix
+\section{Derivation of the Sensitivity Expression}
+
+Here we provide a detailed derivation of the sensitivity expression for the field perturbation due to affine transformations.
+
+Starting with the expression for the electric field:
+
+\begin{equation}
+    \mathbf{E}(\mathbf{r}) = \sum_{j=1}^{N_s} \bar{\mathbf{G}}(\mathbf{r}, \mathbf{r}'_j) \cdot \mathbf{J}_j \Delta S_j
+\end{equation}
+
+After an affine transformation $\mathcal{T}(\mathbf{r}) = \mathbf{A}\mathbf{r} + \mathbf{b}$, the source position changes from $\mathbf{r}'_j$ to $\mathcal{T}(\mathbf{r}'_j) = \mathbf{A}\mathbf{r}'_j + \mathbf{b}$.
+
+For small perturbations where $\mathbf{A} = \mathbf{I} + \delta\mathbf{A}$ and $\mathbf{b} = \delta\mathbf{b}$, we have:
+
+\begin{equation}
+    \mathcal{T}(\mathbf{r}'_j) \approx \mathbf{r}'_j + \delta\mathbf{A}\mathbf{r}'_j + \delta\mathbf{b}
+\end{equation}
+
+The perturbed field can then be expressed as:
+
+\begin{equation}
+    \mathbf{E}_T(\mathbf{r}) = \sum_{j=1}^{N_s} \bar{\mathbf{G}}(\mathbf{r}, \mathbf{r}'_j + \delta\mathbf{A}\mathbf{r}'_j + \delta\mathbf{b}) \cdot \mathbf{J}_j \Delta S_j
+\end{equation}
+
+Using a first-order Taylor expansion of the Green's function:
+
+\begin{equation}
+    \bar{\mathbf{G}}(\mathbf{r}, \mathbf{r}'_j + \delta\mathbf{r}'_j) \approx \bar{\mathbf{G}}(\mathbf{r}, \mathbf{r}'_j) + \delta\mathbf{r}'_j \cdot \nabla_{\mathbf{r}'} \bar{\mathbf{G}}(\mathbf{r}, \mathbf{r}'_j)
+\end{equation}
+
+where $\delta\mathbf{r}'_j = \delta\mathbf{A}\mathbf{r}'_j + \delta\mathbf{b}$.
+
+This leads to the perturbation in the field:
+
+\begin{equation}
+    \delta\mathbf{E}(\mathbf{r}) = \mathbf{E}_T(\mathbf{r}) - \mathbf{E}(\mathbf{r}) \approx \sum_{j=1}^{N_s} \left[ (\delta\mathbf{A}\mathbf{r}'_j + \delta\mathbf{b}) \cdot \nabla_{\mathbf{r}'} \bar{\mathbf{G}}(\mathbf{r}, \mathbf{r}'_j) \right] \cdot \mathbf{J}_j \Delta S_j
+\end{equation}
+
+\section{Appendix B: Numerical Implementation of the Angular Spectrum Method}
+
+The numerical implementation of the Angular Spectrum Method requires careful consideration of sampling and aliasing. Here, we provide the detailed steps:
+
+\subsection{Discrete Implementation}
+
+For a field sampled on an $N_x \times N_y$ grid with spacings $\Delta x$ and $\Delta y$, the discrete angular spectrum is:
+
+\begin{equation}
+    \tilde{\mathbf{E}}[m,n] = \Delta x \Delta y \sum_{p=0}^{N_x-1} \sum_{q=0}^{N_y-1} \mathbf{E}[p,q] e^{-j2\pi\left(\frac{mp}{N_x} + \frac{nq}{N_y}\right)}
+\end{equation}
+
+where $m = 0,1,...,N_x-1$ and $n = 0,1,...,N_y-1$.
+
+The corresponding spatial frequencies are:
+
+\begin{equation}
+    k_x[m] =
+    \begin{cases}
+        \frac{2\pi m}{N_x \Delta x} & \text{for } 0 \leq m \leq \frac{N_x}{2} \\
+        \frac{2\pi (m-N_x)}{N_x \Delta x} & \text{for } \frac{N_x}{2} < m < N_x
+    \end{cases}
+\end{equation}
+
+\begin{equation}
+    k_y[n] =
+    \begin{cases}
+        \frac{2\pi n}{N_y \Delta y} & \text{for } 0 \leq n \leq \frac{N_y}{2} \\
+        \frac{2\pi (n-N_y)}{N_y \Delta y} & \text{for } \frac{N_y}{2} < n < N_y
+    \end{cases}
+\end{equation}
+
+\subsection{Propagation and Anti-Aliasing Filtering}
+
+The propagation factor in discrete form is:
+
+\begin{equation}
+    H[m,n] =
+    \begin{cases}
+        e^{jk_z[m,n](z_1-z_0)} & \text{if } k_x[m]^2 + k_y[n]^2 \leq k^2 \\
+        0 & \text{otherwise}
+    \end{cases}
+\end{equation}
+
+where $k_z[m,n] = \sqrt{k^2 - k_x[m]^2 - k_y[n]^2}$.
+
+The zero-padding factor in the second case is an anti-aliasing filter that removes evanescent waves, which would otherwise cause numerical instabilities.
+
+\subsection{Sampling Requirements for \SI{28}{\giga\hertz}}
+
+At \SI{28}{\giga\hertz}, the wavelength $\lambda \approx \SI{10.7}{\milli\meter}$. To avoid aliasing, the spatial sampling intervals should satisfy:
+
+\begin{equation}
+    \Delta x, \Delta y \leq \frac{\lambda}{2} \approx \SI{5.35}{\milli\meter}
+\end{equation}
+
+For typical room dimensions of several meters, this leads to grid sizes on the order of $1000 \times 1000$ points, which are still efficiently handled by FFT-based implementations of the ASM.
+
+\end{document}
