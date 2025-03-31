@@ -21,7 +21,7 @@ from holographic_phase_retrieval import holographic_phase_retrieval
 from src.simulation_config_real_data import SimulationConfig
 from utils.normalized_correlation import normalized_correlation
 from utils.normalized_rmse import normalized_rmse
-from visualization import visualize_field
+from src.visualization.utils import visualize_field
 
 
 def parse_args():
