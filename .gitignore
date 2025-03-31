@@ -67,3 +67,18 @@ Thumbs.db
 
 # Project specific
 *.log
+
+# Large data files
+*.pkl
+*.pickle
+source_pointcloud.pkl
+
+# Large animation files 
+*.gif
+
+# Large image/output files
+*.png
+
+# Results directories (containing large files)
+*_results/
+*_animations/
