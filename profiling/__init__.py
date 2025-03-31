@@ -10,10 +10,10 @@ from .performance_optimization import (
 # Benchmark utilities
 try:
     from .benchmark_optimizations import (
-        run_all_benchmarks,
         benchmark_channel_matrix,
-        benchmark_svd_methods,
         benchmark_holographic_phase_retrieval,
+        benchmark_svd_methods,
+        run_all_benchmarks,
     )
 except ImportError:
     # Benchmarking tools may have additional dependencies that aren't always available

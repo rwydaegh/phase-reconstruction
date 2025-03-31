@@ -1,19 +1,20 @@
 import cProfile
-import pstats
 import logging
-import sys
 import os
+import pstats
+import sys
 
 # Add parent directory to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import main  # Import the main module
 from profiling.performance_optimization import disable_matplotlib, profile_with_optimizations
 from src.simulation_config_real_data import SimulationConfig
-import main  # Import the main module
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 @profile_with_optimizations
 def run_simulation():
@@ -21,14 +22,14 @@ def run_simulation():
     Run a simulation with performance optimizations applied.
     All matplotlib-related code is disabled to eliminate rendering overhead.
     """
-    
+
     # Create a heavy simulation configuration
     config = SimulationConfig(
         resolution=100,  # High resolution
         num_sources=200,  # Large number of sources
-        gs_iterations=500, # Many iterations
+        gs_iterations=500,  # Many iterations
         convergence_threshold=1e-4,
-        show_plot=False,  # Explicitly disable plots 
+        show_plot=False,  # Explicitly disable plots
         return_history=False,  # Don't store history to reduce memory usage
     )
 
@@ -36,10 +37,11 @@ def run_simulation():
     main.main(config)
     logger.info("Heavy simulation complete.")
 
+
 def profile_simulation():
     # Pre-disable matplotlib before any imports happen
     disable_matplotlib()
-    
+
     profiler = cProfile.Profile()
     profiler.enable()
     run_simulation()
@@ -48,14 +50,14 @@ def profile_simulation():
     # Print general stats
     print("\n=== TOP 20 TIME-CONSUMING FUNCTIONS ===")
     stats = pstats.Stats(profiler)
-    stats.sort_stats('tottime')
+    stats.sort_stats("tottime")
     stats.print_stats(20)
-    
+
     # Print stats specific to our custom code
     print("\n=== CUSTOM CODE BOTTLENECKS ===")
-    stats.sort_stats('cumtime')
-    stats.print_stats('field_utils|holographic_phase_retrieval')
-    
+    stats.sort_stats("cumtime")
+    stats.print_stats("field_utils|holographic_phase_retrieval")
+
     # Print optimization recommendations
     print("\n=== OPTIMIZATION RECOMMENDATIONS ===")
     print("1. SVD Computation Optimization:")
@@ -79,6 +81,7 @@ def profile_simulation():
     print("4. Field Computation Functions:")
     print("   - Remove redundant calls to compute_fields in main.py")
     print("   - Cache intermediate results for repeated calculations")
+
 
 if __name__ == "__main__":
     profile_simulation()
