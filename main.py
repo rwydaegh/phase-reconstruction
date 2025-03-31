@@ -11,7 +11,8 @@ from src.create_test_pointcloud import create_test_pointcloud
 from src.algorithms.gerchberg_saxton import holographic_phase_retrieval
 from src.simulation_config_fake_data import SimulationConfig
 from src.utils.field_utils import compute_fields, reconstruct_field
-from src.visualization import visualize_current_and_field_history # Keep this one
+# from src.visualization import visualize_current_and_field_history # Moved
+from src.visualization.history_plots import visualize_current_and_field_history # Import moved function
 from src.visualization.history_plots import visualize_iteration_history # Import moved function
 from src.visualization.field_plots import visualize_fields
 

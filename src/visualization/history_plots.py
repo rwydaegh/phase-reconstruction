@@ -289,3 +289,324 @@ def visualize_iteration_history(
         plt.show()
     else:
         plt.close()
+
+
+def visualize_current_and_field_history(
+    points: np.ndarray,
+    coefficient_history: np.ndarray,
+    field_history: np.ndarray,
+    true_field: np.ndarray,
+    resolution: int,
+    measurement_plane: np.ndarray,
+    show_plot: bool = True,
+    output_file: Optional[str] = "current_field_animation.gif",
+    frame_skip: int = 3,
+) -> None:
+    """Create animation showing current density history in 3D
+    and field reconstruction history in 2D.
+
+    Args:
+        points: Point coordinates with shape (num_points, 3)
+        coefficient_history: History of coefficients over iterations
+                             with shape (iterations, num_points)
+        field_history: History of reconstructed fields over iterations
+                       with shape (iterations, resolution*resolution)
+        true_field: True complex field to compare against, with shape (resolution*resolution)
+        resolution: Resolution of measurement grid
+        measurement_plane: Measurement plane coordinates
+        show_plot: Whether to display the plot
+        output_file: Path to save the animation
+        frame_skip: Number of frames to skip for faster animation
+                    (higher values = faster animation with fewer frames)
+    """
+    # Determine plane type and set appropriate axis labels
+    x_min, x_max = np.min(measurement_plane[:, :, 0]), np.max(measurement_plane[:, :, 0])
+    y_min, y_max = np.min(measurement_plane[:, :, 1]), np.max(measurement_plane[:, :, 1])
+    z_min, z_max = np.min(measurement_plane[:, :, 2]), np.max(measurement_plane[:, :, 2])
+
+    # Determine plane type and set coordinates and labels
+    if np.allclose(measurement_plane[:, :, 0], x_min):  # YZ plane
+        # For YZ plane, Y is horizontal (dim 1) and Z is vertical (dim 2)
+        # Get unique values to ensure we have the full range
+        horizontal_coords = np.unique(measurement_plane[:, :, 1])  # Unique Y values
+        vertical_coords = np.unique(measurement_plane[:, :, 2])  # Unique Z values
+        horizontal_label = "Y (m)"
+        vertical_label = "Z (m)"
+        plane_type = "YZ"
+    elif np.allclose(measurement_plane[:, :, 1], y_min):  # XZ plane
+        horizontal_coords = measurement_plane[0, :, 0]  # X values
+        vertical_coords = measurement_plane[:, 0, 2]  # Z values
+        horizontal_label = "X (m)"
+        vertical_label = "Z (m)"
+        plane_type = "XZ"
+    else:  # XY plane (default)
+        horizontal_coords = measurement_plane[0, :, 0]  # X values
+        vertical_coords = measurement_plane[:, 0, 1]  # Y values
+        horizontal_label = "X (m)"
+        vertical_label = "Y (m)"
+        plane_type = "XY"
+
+    # Reshape the true field for visualization
+    true_field_2d = np.abs(true_field).reshape(resolution, resolution)
+
+    # Calculate initial field magnitude and find global max for consistent color scaling
+    field_mag = np.abs(field_history[0]).reshape(resolution, resolution)
+
+    # Find global maximum value for consistent colormap scaling between plots
+    global_max = max(
+        np.max(true_field_2d),
+        np.max(
+            [
+                np.max(np.abs(field_history[i]).reshape(resolution, resolution))
+                for i in range(len(field_history))
+            ]
+        ),
+    )
+
+    # Create figure with a 2x2 grid of subplots
+    fig = plt.figure(figsize=(15, 12))
+
+    # Top left: 3D current density
+    ax1 = fig.add_subplot(2, 2, 1, projection="3d")
+
+    # Top right: Field magnitude history
+    ax2 = fig.add_subplot(2, 2, 2)
+
+    # Bottom left: True field
+    ax3 = fig.add_subplot(2, 2, 3)
+
+    # Bottom right: Error/difference
+    ax4 = fig.add_subplot(2, 2, 4)
+
+    # Initial 3D scatter plot of points with current densities (top left)
+    current_mags = np.abs(coefficient_history[0])
+    if np.max(current_mags) > 0:
+        # More extreme scaling - almost invisible for zero values, larger for high values
+        normalized_mags = current_mags / np.max(current_mags)
+
+        # Make sizes very small (near zero) for zero current, larger for higher currents
+        sizes = 0.5 + 150 * normalized_mags**2  # Square for more dramatic effect
+
+        # Make colors more transparent for low values
+        alphas = 0.2 + 0.8 * normalized_mags  # Range from 0.2 to 1.0 transparency
+    else:
+        sizes = 0.5  # Near-zero size for all points if all currents are zero
+        alphas = 0.2  # Low alpha for all points if all currents are zero
+
+    scatter = ax1.scatter(
+        points[:, 0],
+        points[:, 1],
+        points[:, 2],
+        c=current_mags,
+        s=sizes,
+        cmap="plasma",
+        alpha=alphas,
+    )
+
+    # Set 3D plot labels and title
+    ax1.set_title("Current Density Distribution")
+    ax1.set_xlabel("X (m)")
+    ax1.set_ylabel("Y (m)")
+    ax1.set_zlabel("Z (m)")
+
+    # Add measurement plane visualization
+    # Extract the extent of the measurement plane
+    x_min, x_max = np.min(measurement_plane[:, :, 0]), np.max(measurement_plane[:, :, 0])
+    y_min, y_max = np.min(measurement_plane[:, :, 1]), np.max(measurement_plane[:, :, 1])
+    z_min, z_max = np.min(measurement_plane[:, :, 2]), np.max(measurement_plane[:, :, 2])
+
+    # Create a rectangular face based on the extent
+    if np.allclose(measurement_plane[:, :, 0], x_min):  # YZ plane
+        xx, yy = np.meshgrid([x_min, x_min], [y_min, y_max])
+        zz = np.meshgrid([z_min, z_max], [z_min, z_max])[0]
+    elif np.allclose(measurement_plane[:, :, 1], y_min):  # XZ plane
+        xx, yy = np.meshgrid([x_min, x_max], [y_min, y_min])
+        zz = np.meshgrid([z_min, z_max], [z_min, z_max])[0]
+    else:  # XY plane
+        xx, yy = np.meshgrid([x_min, x_max], [y_min, y_max])
+        zz = np.ones_like(xx) * z_min
+
+    # Plot the face with semi-transparency
+    ax1.plot_surface(xx, yy, zz, alpha=0.3, color="cyan", edgecolor="blue")
+
+    # Add colorbar for current magnitude
+    plt.colorbar(scatter, ax=ax1, label="Current Magnitude")
+
+    # Set extent for 2D plots using the detected coordinates
+    extent = [
+        horizontal_coords.min(),
+        horizontal_coords.max(),
+        vertical_coords.min(),
+        vertical_coords.max(),
+    ]
+
+    # Initial 2D field magnitude plot (top right)
+    im1 = ax2.imshow(
+        field_mag, cmap="viridis", origin="lower", extent=extent, vmin=0, vmax=global_max
+    )  # Use consistent color scale
+    ax2.set_title(f"Reconstructed Field Magnitude ({plane_type} Plane)")
+    ax2.set_xlabel(horizontal_label)
+    ax2.set_ylabel(vertical_label)
+    plt.colorbar(im1, ax=ax2, label="Field Magnitude")
+
+    # True field magnitude plot (bottom left)
+    im2 = ax3.imshow(
+        true_field_2d, cmap="viridis", origin="lower", extent=extent, vmin=0, vmax=global_max
+    )  # Use consistent color scale
+    ax3.set_title(f"True Field Magnitude ({plane_type} Plane)")
+    ax3.set_xlabel(horizontal_label)
+    ax3.set_ylabel(vertical_label)
+    plt.colorbar(im2, ax=ax3, label="Field Magnitude")
+
+    # Initial error/difference plot (bottom right)
+    error = np.abs(field_mag - true_field_2d)
+    im3 = ax4.imshow(error, cmap="hot", origin="lower", extent=extent)
+    ax4.set_title(f"Error (Absolute Difference) ({plane_type} Plane)")
+    ax4.set_xlabel(horizontal_label)
+    ax4.set_ylabel(vertical_label)
+    plt.colorbar(im3, ax=ax4, label="Error Magnitude")
+
+    # Text for iteration number
+    iter_text = fig.text(
+        0.5, 0.98, "Iteration: 0", ha="center", va="center", fontsize=14, fontweight="bold"
+    )
+
+    # Smart adaptation of frame_skip based on total iteration count
+    total_frames = len(field_history)
+
+    # Calculate optimal frame_skip to target 60-100 frames
+    # 1. For very short histories (<60), keep all frames
+    # 2. For medium histories, aim for ~60-80 frames
+    # 3. For very long histories (>1000), aim for ~100 frames
+    if total_frames <= 60:
+        # For short histories, keep all frames
+        adaptive_frame_skip = 1
+    elif total_frames <= 200:
+        # For medium histories, skip a few frames to get around 60-80 frames
+        adaptive_frame_skip = max(1, total_frames // 60)
+    else:
+        # For longer histories, be more aggressive with skipping
+        # as iterations get higher, target ~100 frames
+        adaptive_frame_skip = max(2, total_frames // 100)
+
+    # If user specified a frame_skip, use the larger value
+    final_frame_skip = max(frame_skip, adaptive_frame_skip)
+
+    # Select frames based on final_frame_skip
+    selected_frames = range(0, total_frames, final_frame_skip)
+    selected_coefficient_history = coefficient_history[selected_frames]
+    selected_field_history = field_history[selected_frames]
+    num_selected_frames = len(selected_frames)
+
+    # Adapt animation interval based on frame count:
+    # - Fewer frames -> slower animation (longer interval)
+    # - More frames -> faster animation (shorter interval)
+    if num_selected_frames < 30:
+        # interval = 250  # Slower for fewer frames - 3D needs more time # Unused
+        pass
+    elif num_selected_frames < 60:
+        # interval = 200  # Medium speed # Unused
+        pass
+    else:
+        # interval = 150  # Faster for many frames # Unused
+        pass
+
+    # Create animation function
+    def update(i):
+        # Get actual frame index
+        frame = selected_frames[i]
+
+        # Clear previous 3D scatter plot to prevent overcrowding
+        ax1.clear()
+
+        # Update current density scatter plot
+        current_mags = np.abs(selected_coefficient_history[i])
+        if np.max(current_mags) > 0:
+            # More extreme scaling - almost invisible for zero values, larger for high values
+            normalized_mags = current_mags / np.max(current_mags)
+
+            # Make sizes very small (near zero) for zero current, larger for higher currents
+            sizes = 0.5 + 150 * normalized_mags**2  # Square for more dramatic effect
+
+            # Make colors more transparent for low values
+            alphas = 0.2 + 0.8 * normalized_mags  # Range from 0.2 to 1.0 transparency
+        else:
+            sizes = 0.5  # Near-zero size for all points if all currents are zero
+            alphas = 0.2  # Low alpha for all points if all currents are zero
+
+        scatter = ax1.scatter(
+            points[:, 0],
+            points[:, 1],
+            points[:, 2],
+            c=current_mags,
+            s=sizes,
+            cmap="plasma",
+            alpha=alphas,
+        )
+
+        # Restore 3D plot settings
+        ax1.set_title("Current Density Distribution")
+        ax1.set_xlabel("X (m)")
+        ax1.set_ylabel("Y (m)")
+        ax1.set_zlabel("Z (m)")
+        # Set equal aspect ratio for 3D plot
+        ax1.set_box_aspect([1, 1, 1])
+
+        # Add measurement plane visualization for each frame
+        # Extract the extent of the measurement plane
+        x_min, x_max = np.min(measurement_plane[:, :, 0]), np.max(measurement_plane[:, :, 0])
+        y_min, y_max = np.min(measurement_plane[:, :, 1]), np.max(measurement_plane[:, :, 1])
+        z_min, z_max = np.min(measurement_plane[:, :, 2]), np.max(measurement_plane[:, :, 2])
+
+        # Create a rectangular face based on the extent
+        if np.allclose(measurement_plane[:, :, 0], x_min):  # YZ plane
+            xx, yy = np.meshgrid([x_min, x_min], [y_min, y_max])
+            zz = np.meshgrid([z_min, z_max], [z_min, z_max])[0]
+        elif np.allclose(measurement_plane[:, :, 1], y_min):  # XZ plane
+            xx, yy = np.meshgrid([x_min, x_max], [y_min, y_min])
+            zz = np.meshgrid([z_min, z_max], [z_min, z_max])[0]
+        else:  # XY plane
+            xx, yy = np.meshgrid([x_min, x_max], [y_min, y_max])
+            zz = np.ones_like(xx) * z_min
+
+        # Plot the face with semi-transparency
+        ax1.plot_surface(xx, yy, zz, alpha=0.3, color="cyan", edgecolor="blue")
+
+        # Make the 3D view rotate by changing the azimuth angle in each frame
+        rotation_speed = 360 / len(selected_frames)
+        current_azim = (i * rotation_speed) % 360
+        ax1.view_init(elev=30, azim=current_azim)
+
+        # Update reconstructed field magnitude
+        field_mag = np.abs(selected_field_history[i]).reshape(resolution, resolution)
+        im1.set_array(field_mag)
+
+        # Update error/difference plot
+        error = np.abs(field_mag - true_field_2d)
+        im3.set_array(error)
+
+        # Update iteration text
+        iter_text.set_text(f"Iteration: {frame}")
+
+        return [scatter, im1, im3, iter_text]
+
+    # Create animation with fewer frames
+    # Disable blitting to ensure 3D rotation works properly
+    anim = FuncAnimation(fig, update, frames=len(selected_frames), interval=200, blit=False)
+
+    plt.tight_layout()
+
+    # Save animation if output file specified
+    if output_file:
+        # Adjust FPS proportionally to maintain similar animation duration
+        adjusted_fps = max(5, 15 // frame_skip)
+        anim.save(output_file, writer="pillow", fps=adjusted_fps)
+        print(
+            f"Saved animation to {output_file} (skipping {frame_skip-1} frames, fps={adjusted_fps})"
+        )
+
+    # Show plot if requested
+    if show_plot:
+        plt.show()
+    else:
+        plt.close()
