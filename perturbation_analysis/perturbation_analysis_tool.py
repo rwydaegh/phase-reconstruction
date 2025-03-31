@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 # Import from the project
 from src.create_test_pointcloud import create_test_pointcloud
-from src.holographic_phase_retrieval import holographic_phase_retrieval
+from src.algorithms.gerchberg_saxton import holographic_phase_retrieval
 from src.simulation_config_real_data import SimulationConfig
 from src.utils.field_utils import create_channel_matrix
 from src.utils.normalized_correlation import normalized_correlation

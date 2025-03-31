@@ -8,7 +8,7 @@ import numpy as np
 
 from src.create_channel_matrix import create_channel_matrix
 from src.create_test_pointcloud import create_test_pointcloud
-from src.holographic_phase_retrieval import holographic_phase_retrieval
+from src.algorithms.gerchberg_saxton import holographic_phase_retrieval
 from src.simulation_config_fake_data import SimulationConfig
 from src.utils.field_utils import compute_fields, reconstruct_field
 from src.visualization import (

@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # Import original implementations
-from src.holographic_phase_retrieval import holographic_phase_retrieval
+from src.algorithms.gerchberg_saxton import holographic_phase_retrieval
 from src.holographic_phase_retrieval_optimized import (
     holographic_phase_retrieval_optimized,
     svd_randomized,

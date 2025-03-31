@@ -138,7 +138,7 @@ def run_simulation_and_get_metrics(config: SimulationConfig) -> Tuple[float, flo
     import random
 
     from src.create_test_pointcloud import create_test_pointcloud
-    from src.holographic_phase_retrieval import holographic_phase_retrieval
+    from src.algorithms.gerchberg_saxton import holographic_phase_retrieval
     from src.utils.field_utils import compute_fields, create_channel_matrix, reconstruct_field
 
     # Create test environment
