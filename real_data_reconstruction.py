@@ -542,5 +542,4 @@ def main(cfg: DictConfig) -> None:
     logger.info("Cube environment reconstruction complete!")
 
 
-if __name__ == "__main__":
-    main()
+# Entry point handled by @hydra.main decorator
