@@ -53,6 +53,7 @@ def test_two_source_center_field(
         measurement_plane=CENTER_POINT,  # Pass the single point
         measurement_direction=measurement_direction,
         k=K,
+        use_vector_model=True,  # Added missing argument
     )
     assert H.shape == (1, 4), f"Test setup error: H shape is {H.shape}, expected (1, 4)"
 

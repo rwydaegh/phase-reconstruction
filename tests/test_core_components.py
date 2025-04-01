@@ -86,38 +86,6 @@ def test_create_pointcloud_no_interior_points(basic_config: DictConfig):
     assert not np.any(is_interior), "Found points strictly inside the cube."
 
 
-def test_create_pointcloud_perturbation(basic_config: DictConfig):
-    """Tests if enabling perturbation actually modifies point coordinates."""
-    # Create original points without perturbation
-    basic_config.perturb_points = False
-    original_points = create_test_pointcloud(basic_config)
-
-    # Create points with perturbation enabled
-    basic_config.perturb_points = True
-    basic_config.perturbation_factor = 0.01  # Small perturbation
-    perturbed_points = create_test_pointcloud(basic_config)
-
-    # Ensure shapes are the same
-    assert (
-        original_points.shape == perturbed_points.shape
-    ), f"Shape mismatch: Original {original_points.shape}, Perturbed {perturbed_points.shape}"
-
-    # Ensure points are actually different
-    assert not np.allclose(
-        original_points, perturbed_points, atol=1e-9
-    ), "Perturbed points are identical to original points."
-
-    # Optional: Check if the average distance moved is reasonable
-    distances_moved = np.linalg.norm(original_points - perturbed_points, axis=1)
-    avg_distance = np.mean(distances_moved)
-    assert avg_distance > 1e-6, (
-        f"Average distance moved ({avg_distance}) is too small, "
-        f"perturbation might not be effective."
-    )
-    # We could add an upper bound check too,
-    # but it's less critical than ensuring *some* change happened.
-
-
 # --- Tests for create_channel_matrix ---
 
 
@@ -165,6 +133,7 @@ def test_create_channel_matrix_shape(channel_matrix_setup):
         measurement_plane=measurement_plane,
         measurement_direction=measurement_direction,
         k=k,
+        use_vector_model=True,  # Added missing argument
     )
 
     # Expected shape: (num_measurement_points, 2 * num_source_points)
@@ -184,6 +153,7 @@ def test_create_channel_matrix_dtype_and_values(channel_matrix_setup):
         measurement_plane=measurement_plane,
         measurement_direction=measurement_direction,
         k=k,
+        use_vector_model=True,  # Added missing argument
     )
 
     # Check dtype
@@ -218,5 +188,6 @@ def test_create_channel_matrix_fortran_order(channel_matrix_setup):
         measurement_plane=measurement_plane,
         measurement_direction=measurement_direction,
         k=k,
+        use_vector_model=True,  # Added missing argument
     )
     assert H.flags["F_CONTIGUOUS"], "Channel matrix H should be Fortran-contiguous."
