@@ -74,6 +74,7 @@ packages = [
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.5"
 flake8 = "^7.1.0"
+pre-commit = "^4.2.0"
 
 [project]
 name = "phase-reconstruction"
