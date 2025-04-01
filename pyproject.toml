@@ -80,14 +80,17 @@ skip-magic-trailing-comma = false
 line-ending = "auto"
 
 [tool.poetry]
+# Define the package structure.
+# Include the 'src' directory itself as the root of the package content.
 packages = [
-    { include = "phase_reconstruction", from = "src" },
+    { include = "src" },
 ]
 
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.5"
 flake8 = "^7.1.0"
+pre-commit = "^4.2.0"
 
 [project]
 name = "phase-reconstruction"

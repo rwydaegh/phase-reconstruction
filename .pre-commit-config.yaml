@@ -1,0 +1,35 @@
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+repos:
+-   repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0 # Use a specific tag or commit hash
+    hooks:
+    -   id: trailing-whitespace
+    -   id: end-of-file-fixer
+    -   id: check-yaml
+    -   id: check-added-large-files
+-   repo: https://github.com/astral-sh/ruff-pre-commit
+    # Ruff version. Must be aligned with the version in pyproject.toml
+    rev: v0.6.1
+    hooks:
+    # Run the linter.
+    -   id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+    # Run the formatter.
+    -   id: ruff-format
+# Note: We are using ruff which includes flake8 checks, so no separate flake8 hook needed here.
+# If you specifically wanted the exact flake8 commands from CI, you could add:
+# -   repo: local
+#     hooks:
+#     -   id: flake8-strict
+#         name: flake8 strict checks
+#         entry: poetry run flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+#         language: system
+#         types: [python]
+#         pass_filenames: false
+#     -   id: flake8-style
+#         name: flake8 style checks
+#         entry: poetry run flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+#         language: system
+#         types: [python]
+#         pass_filenames: false
