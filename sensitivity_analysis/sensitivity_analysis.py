@@ -11,20 +11,19 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 # Third-party imports
 import numpy as np
-from omegaconf import DictConfig, OmegaConf # Import DictConfig and OmegaConf
-
+from omegaconf import DictConfig, OmegaConf  # Import DictConfig and OmegaConf
 
 # Add parent directory to path to find modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Local application imports
-from omegaconf import DictConfig # Import DictConfig for type hinting
 
 # Import necessary functions from src
 from src.algorithms.gerchberg_saxton import holographic_phase_retrieval
-from src.create_test_pointcloud import create_test_pointcloud
+
 # Import the correct vectorized create_channel_matrix and the updated reconstruct_field wrapper
 from src.create_channel_matrix import create_channel_matrix
+from src.create_test_pointcloud import create_test_pointcloud
 from src.utils.field_utils import reconstruct_field
 from src.utils.normalized_correlation import normalized_correlation
 from src.utils.normalized_rmse import normalized_rmse
@@ -32,6 +31,7 @@ from src.utils.normalized_rmse import normalized_rmse
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 @dataclass
 class ParameterRange:
@@ -91,9 +91,19 @@ class SensitivityAnalysisConfig:
                 # Update with specific parameter values, ensuring type consistency
                 param1_val = val1
                 param2_val = val2
-                if param1.param_name in ["wall_points", "resolution", "num_sources", "gs_iterations"]:
+                if param1.param_name in [
+                    "wall_points",
+                    "resolution",
+                    "num_sources",
+                    "gs_iterations",
+                ]:
                     param1_val = int(val1)
-                if param2.param_name in ["wall_points", "resolution", "num_sources", "gs_iterations"]:
+                if param2.param_name in [
+                    "wall_points",
+                    "resolution",
+                    "num_sources",
+                    "gs_iterations",
+                ]:
                     param2_val = int(val2)
 
                 config_dict[param1.param_name] = param1_val
@@ -119,7 +129,7 @@ def run_simulation(config_dict: Dict[Any, Any]) -> Dict[str, Any]:
 
     # Pass the config dictionary directly, assuming the called function handles it.
     # If holographic_phase_retrieval strictly needs DictConfig, convert here.
-    config = config_dict # Pass the dictionary directly for now
+    config = config_dict  # Pass the dictionary directly for now
 
     try:
         start_time = time.time()
@@ -146,51 +156,62 @@ def run_simulation(config_dict: Dict[Any, Any]) -> Dict[str, Any]:
 def run_simulation_and_get_metrics(config: Dict) -> Tuple[float, float]:
     """Run simulation and return metrics without visualization"""
     import random
-    from omegaconf import OmegaConf # Needed to access DictConfig attributes easily
 
-    # Convert dict to DictConfig for easier attribute access
+    from omegaconf import OmegaConf  # Needed to access DictConfig attributes easily
+
+    # Convert dict to DictConfig for easier attribute access and default handling
+    # Ensure use_vector_model exists, default to True if not specified in base config
+    if "use_vector_model" not in config:
+        config["use_vector_model"] = True  # Default to vector model for sensitivity
     cfg = OmegaConf.create(config)
 
     # Create test environment
-    points = create_test_pointcloud(cfg) # Pass DictConfig
-    # Calculate tangents for the test point cloud (assuming default normals [0, 0, 1])
-    logger.debug("Calculating tangents for generated point cloud (assuming default normals [0, 0, 1]).")
-    temp_normals = np.zeros_like(points)
-    temp_normals[:, 2] = 1.0
-    # Need the tangent calculation function from its new location
-    try:
-        # Adjust import path relative to this file's location
+    points = create_test_pointcloud(cfg)  # Pass DictConfig
+    N_c = points.shape[0]
+
+    # Initialize tangents and measurement direction
+    tangents1 = None
+    tangents2 = None
+    measurement_direction = None
+
+    if cfg.use_vector_model:
+        # Calculate tangents for the test point cloud using geometry utils
+        from src.utils.geometry_utils import get_cube_normals
+
+        points, temp_normals = get_cube_normals(points, cfg.room_size)
+        N_c = points.shape[0]  # Update N_c after potential filtering
+        if N_c == 0:
+            raise ValueError("No valid points after normal calculation in sensitivity run.")
+        logger.debug(
+            f"Calculating tangents for {N_c} generated cube points (using inward normals)."
+        )
         from src.utils.preprocess_pointcloud import get_tangent_vectors
-    except ImportError:
-         # Add src/utils directory to path if needed (adjust relative path as necessary)
-         # This might be needed if running the script directly from sensitivity_analysis/
-         utils_dir = os.path.join(os.path.dirname(__file__), '..', 'src', 'utils')
-         if utils_dir not in sys.path:
-              sys.path.append(utils_dir)
-         from preprocess_pointcloud import get_tangent_vectors # Now should work
 
-    tangents1, tangents2 = get_tangent_vectors(temp_normals)
-    logger.debug(f"Generated tangents1 shape: {tangents1.shape}")
-    logger.debug(f"Generated tangents2 shape: {tangents2.shape}")
+        tangents1, tangents2 = get_tangent_vectors(temp_normals)
+        logger.debug(f"Generated tangents1 shape: {tangents1.shape}")
+        logger.debug(f"Generated tangents2 shape: {tangents2.shape}")
 
-    # Get measurement direction from config
-    try:
-        measurement_direction = np.array(cfg.measurement_direction, dtype=float)
-        if measurement_direction.shape != (3,): raise ValueError("Shape must be (3,)")
-        norm_meas = np.linalg.norm(measurement_direction)
-        if norm_meas < 1e-9: raise ValueError("Norm cannot be zero.")
-        measurement_direction /= norm_meas
-        logger.debug(f"Using measurement direction: {measurement_direction}")
-    except Exception as e:
-        logger.warning(f"Using default measurement direction [0, 1, 0] due to error: {e}")
-        measurement_direction = np.array([0.0, 1.0, 0.0])
+        # Get measurement direction from config
+        try:
+            measurement_direction = np.array(cfg.measurement_direction, dtype=float)
+            if measurement_direction.shape != (3,):
+                raise ValueError("Shape must be (3,)")
+            norm_meas = np.linalg.norm(measurement_direction)
+            if norm_meas < 1e-9:
+                raise ValueError("Norm cannot be zero.")
+            measurement_direction /= norm_meas
+            logger.debug(f"Using measurement direction: {measurement_direction}")
+        except Exception as e:
+            logger.warning(f"Using default measurement direction [0, 1, 0] due to error: {e}")
+            measurement_direction = np.array([0.0, 1.0, 0.0])
 
-    # Create currents vector (2 components per point)
-    N_c = len(points)
-    currents = np.zeros(2 * N_c, dtype=complex)
-    num_sources = min(cfg.num_sources, N_c) # Number of points to activate
-    # Indices of points (0 to N_c-1)
-    source_indices = random.sample(range(N_c), int(num_sources))
+    # Initialize currents based on model
+    num_sources = min(cfg.num_sources, N_c)  # Number of points to activate
+    source_indices = random.sample(range(N_c), int(num_sources))  # Indices of points (0 to N_c-1)
+    if cfg.use_vector_model:
+        currents = np.zeros(2 * N_c, dtype=complex)
+    else:
+        currents = np.zeros(N_c, dtype=complex)
 
     # Use the same random seed for all simulations to ensure fair comparison
     np.random.seed(42)
@@ -202,17 +223,21 @@ def run_simulation_and_get_metrics(config: Dict) -> Tuple[float, float]:
     # Generate random phases between 0 and 2π
     phases = np.random.uniform(0, 2 * np.pi, size=int(num_sources))
 
-    # Set complex currents for the first component of selected points
-    logger.debug(f"Assigning random currents to {num_sources} source points (first tangent component)...")
+    # Set complex currents
+    logger.debug(f"Assigning random currents to {num_sources} source points...")
     for i, point_idx in enumerate(source_indices):
-        current_idx = 2 * point_idx # Index for the first component
-        currents[current_idx] = amplitudes[i] * np.exp(1j * phases[i])
-        # currents[current_idx + 1] = 0.0 # Second component remains zero
+        value = amplitudes[i] * np.exp(1j * phases[i])
+        if cfg.use_vector_model:
+            current_idx = 2 * point_idx  # Index for the first component
+            currents[current_idx] = value
+            # currents[current_idx + 1] = 0.0 # Second component remains zero
+        else:
+            currents[point_idx] = value
 
     # Ensure at least one source if num_sources was 0 or less
     if num_sources <= 0 and N_c > 0:
-        logger.warning("num_sources <= 0, activating the first component of the first point.")
-        currents[0] = 1.0 # Activate first component of first point
+        logger.warning("num_sources <= 0, activating the first point/component.")
+        currents[0] = 1.0  # Activate first point (scalar) or first component (vector)
 
     # Create measurement plane (Ensure keys exist in cfg)
     resolution = int(cfg.resolution)
@@ -232,22 +257,31 @@ def run_simulation_and_get_metrics(config: Dict) -> Tuple[float, float]:
     measurement_plane = np.stack([X, Y, np.ones_like(X) * room_size / 2], axis=-1)
 
     # Create channel matrix
-    k = cfg.get("k", 2 * np.pi / cfg.wavelength)
-    H = create_channel_matrix(points, tangents1, tangents2, measurement_plane, measurement_direction, k)
+    k = cfg.get("k", 2 * np.pi / cfg.wavelength)  # Use get for safety if k isn't guaranteed
+    H = create_channel_matrix(
+        points=points,
+        measurement_plane=measurement_plane,
+        k=k,
+        use_vector_model=cfg.use_vector_model,
+        tangents1=tangents1,  # Will be None if scalar
+        tangents2=tangents2,  # Will be None if scalar
+        measurement_direction=measurement_direction,  # Will be None if scalar
+    )
 
     # Calculate ground truth field on measurement plane
-    # Calculate ground truth field: H (N_m, 2*N_c) @ currents (2*N_c,) -> true_field (N_m,)
+    # Calculate ground truth field
     true_field = H @ currents
 
     # Get field magnitude (what we would measure)
     measured_magnitude = np.abs(true_field)
 
     # Phase retrieval
+    # Phase retrieval - assume HPR handles H shape internally
     hpr_result = holographic_phase_retrieval(
-        cfg, # Configuration object
-        H,   # Channel matrix (N_m, 2*N_c)
-        measured_magnitude, # Measured field magnitude (N_m,)
-    ) # Expects cluster_coefficients of shape (2*N_c,) as output
+        cfg=cfg,
+        channel_matrix=H,
+        measured_magnitude=measured_magnitude,
+    )
 
     # Handle return value (might be tuple)
     if isinstance(hpr_result, tuple):
@@ -256,7 +290,7 @@ def run_simulation_and_get_metrics(config: Dict) -> Tuple[float, float]:
         cluster_coefficients = hpr_result
 
     # Reconstruct field using estimated coefficients
-    # Reconstruct field: H (N_m, 2*N_c) @ cluster_coefficients (2*N_c,) -> reconstructed_field (N_m,)
+    # Reconstruct field using estimated coefficients
     reconstructed_field = reconstruct_field(H, cluster_coefficients)
 
     # Calculate metrics
@@ -301,14 +335,14 @@ def run_sensitivity_analysis(analysis_config: SensitivityAnalysisConfig):
                     for config_dict in config_dicts
                 }
 
-                for i, future in enumerate(as_completed(future_to_config)):
+                for _i, future in enumerate(as_completed(future_to_config)):
                     result = future.result()
                     results.append(result)
                     # Optional: Log progress less verbosely or based on a flag
                     # logger.debug(f"Completed simulation {i+1}/{len(config_dicts)}")
         else:
             # Sequential execution
-            for i, config_dict in enumerate(config_dicts):
+            for _i, config_dict in enumerate(config_dicts):
                 result = run_simulation(config_dict)
                 results.append(result)
                 # Optional: Log progress less verbosely or based on a flag
@@ -330,8 +364,8 @@ def run_sensitivity_analysis(analysis_config: SensitivityAnalysisConfig):
 
         # Save raw data as numpy arrays for future analysis
         data_filename = os.path.join(
-             analysis_config.output_dir,
-             f"sensitivity_{param1.param_name}_vs_{param2.param_name}_data.npz"
+            analysis_config.output_dir,
+            f"sensitivity_{param1.param_name}_vs_{param2.param_name}_data.npz",
         )
         np.savez(
             data_filename,
@@ -344,5 +378,3 @@ def run_sensitivity_analysis(analysis_config: SensitivityAnalysisConfig):
             param2_name=param2.param_name,
         )
         logger.info(f"Saved raw data to {data_filename}")
-
-

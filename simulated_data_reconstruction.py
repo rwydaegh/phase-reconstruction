@@ -11,18 +11,20 @@ from omegaconf import DictConfig, OmegaConf
 from src.algorithms.gerchberg_saxton import holographic_phase_retrieval
 from src.create_channel_matrix import create_channel_matrix
 from src.create_test_pointcloud import create_test_pointcloud
-from src.utils.field_utils import compute_fields, reconstruct_field # These now expect tangents1, tangents2, meas_dir, and 2*N_c currents
+from src.utils.field_utils import (  # These now expect flag + conditional args
+    compute_fields,
+    reconstruct_field,
+)
 from src.visualization.field_plots import visualize_fields
 from src.visualization.history_plots import (
     visualize_current_and_field_history,
     visualize_iteration_history,
 )
-from src.visualization.vector_plots import visualize_vectors # Import the new function
+from src.visualization.vector_plots import visualize_vectors  # Import the new function
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 # Removed internal _get_cube_normals function
-
 
 
 @hydra.main(config_path="conf", config_name="simulated_data", version_base="1.2")
@@ -34,6 +36,11 @@ def main(cfg: DictConfig) -> None:
     logger.info(f"use_source_pointcloud: {cfg.use_source_pointcloud}")
     logger.info(f"Hydra output directory: {output_dir}")
 
+    # Set random seed for reproducibility
+    seed = cfg.random_seed
+    random.seed(seed)
+    np.random.seed(seed)
+    logger.info(f"Using random seed: {seed}")
 
     if cfg.use_source_pointcloud:
         logger.info(f"Loading source point cloud from {cfg.source_pointcloud_path}...")
@@ -51,17 +58,22 @@ def main(cfg: DictConfig) -> None:
             logger.info(f"  Tangents1 shape: {tangents1.shape}")
             logger.info(f"  Tangents2 shape: {tangents2.shape}")
         elif data.shape[1] == 7:
-            logger.warning(f"Loaded point cloud from {cfg.source_pointcloud_path} has only 7 columns. Calculating tangents and overwriting the file...")
+            logger.warning(
+                f"Loaded point cloud from {cfg.source_pointcloud_path} has only 7 columns. Calculating tangents and overwriting the file..."
+            )
             points = data[:, :3]
-            normals = data[:, 4:7] # Assuming columns 4, 5, 6 are nx, ny, nz
+            normals = data[:, 4:7]  # Assuming columns 4, 5, 6 are nx, ny, nz
             # Need the tangent calculation function
             from src.utils.preprocess_pointcloud import get_tangent_vectors
+
             tangents1, tangents2 = get_tangent_vectors(normals)
             logger.info(f"Calculated tangents. t1: {tangents1.shape}, t2: {tangents2.shape}")
 
             # Combine and save back to the original file
             output_data = np.hstack((data, tangents1, tangents2))
-            logger.info(f"Overwriting {cfg.source_pointcloud_path} with preprocessed data (13 columns)...")
+            logger.info(
+                f"Overwriting {cfg.source_pointcloud_path} with preprocessed data (13 columns)..."
+            )
             try:
                 with open(cfg.source_pointcloud_path, "wb") as f_out:
                     pickle.dump(output_data, f_out)
@@ -70,7 +82,9 @@ def main(cfg: DictConfig) -> None:
                 logger.error(f"Failed to overwrite {cfg.source_pointcloud_path}: {e}")
                 # Continue with calculated tangents, but log the error
         else:
-             raise ValueError(f"Loaded point cloud data has unexpected shape: {data.shape}. Expected 7 or 13 columns.")
+            raise ValueError(
+                f"Loaded point cloud data has unexpected shape: {data.shape}. Expected 7 or 13 columns."
+            )
 
     else:
         logger.info("Creating test point cloud...")
@@ -78,6 +92,7 @@ def main(cfg: DictConfig) -> None:
         # Get normals for the generated cube points using the utility function
         # Get normals for the generated cube points using the utility function
         from src.utils.geometry_utils import get_cube_normals
+
         # get_cube_normals now returns all points and their calculated inward normals
         # (normals might be zero for points not clearly on a single face)
         points, temp_normals = get_cube_normals(points, cfg.room_size)
@@ -86,49 +101,74 @@ def main(cfg: DictConfig) -> None:
         logger.info("Calculating tangents for generated cube point cloud (using inward normals).")
         # Need the tangent calculation function from its new location
         from src.utils.preprocess_pointcloud import get_tangent_vectors
+
         tangents1, tangents2 = get_tangent_vectors(temp_normals)
         logger.info(f"Generated tangents1 shape: {tangents1.shape}")
         logger.info(f"Generated tangents2 shape: {tangents2.shape}")
-        # Visualize the calculated vectors for verification (Moved here)
-        if not cfg.no_plot: # Check if plotting is enabled
-             visualize_vectors(
-                  points=points,
-                  normals=temp_normals, # Pass the calculated normals
-                  tangents1=tangents1,
-                  tangents2=tangents2,
-                  num_vectors=50, # Plot vectors for ~50 random points
-                  scale=0.1 * cfg.room_size, # Scale arrows relative to room size
-                  output_dir=output_dir,
-                  show_plot=cfg.show_plot,
-                  filename="generated_cube_vectors.png"
-             )
 
+    logger.info(f"Initial point cloud shape: {points.shape}")
+    points_true = points.copy()  # This is the ground truth geometry
+    tangents1_true = tangents1.copy() if tangents1 is not None else None
+    tangents2_true = tangents2.copy() if tangents2 is not None else None
 
-    logger.info(f"Using point cloud shape: {points.shape}")
+    if cfg.get("perturb_points", False):  # Check if perturbation is enabled (default False)
+        perturbation_factor = cfg.get(
+            "perturbation_factor", 0.01
+        )  # Get factor from config, default 0.01
+        logger.info(
+            f"Perturbing points with distance-scaled uniform noise (factor: {perturbation_factor})..."
+        )
+        # Calculate distance from origin for each true point
+        distances = np.sqrt(np.sum(points_true**2, axis=1))
+        # Generate uniform random perturbations [-1, 1] for each coordinate
+        random_perturbations = np.random.uniform(-1, 1, size=points_true.shape)
+        # Scale perturbations by the factor and the distance
+        scaled_perturbations = random_perturbations * perturbation_factor * distances[:, np.newaxis]
+        # Apply perturbation
+        points_perturbed = points_true + scaled_perturbations
+        # For simplicity, we assume tangents don't change significantly with small perturbations
+        # If tangent recalculation is needed, it would go here.
+        tangents1_perturbed = tangents1_true
+        tangents2_perturbed = tangents2_true
+        logger.info(f"Perturbed point cloud shape: {points_perturbed.shape}")
+    else:
+        logger.info("Point perturbation disabled.")
+        points_perturbed = points_true
+        tangents1_perturbed = tangents1_true
+        tangents2_perturbed = tangents2_true
+
     # logger.info(f"Using normals shape: {normals.shape}") # No longer primary input
-
-    # Currents vector now needs 2 entries per point
+    # Initialize currents based on the selected model
     N_c = len(points)
-    currents = np.zeros(2 * N_c, dtype=complex)
+    if cfg.use_vector_model:
+        currents = np.zeros(2 * N_c, dtype=complex)  # Vector model: 2 components per point
+        logger.info(f"Initializing vector currents array shape: {currents.shape}")
+    else:
+        currents = np.zeros(N_c, dtype=complex)  # Scalar model: 1 component per point
+        logger.info(f"Initializing scalar currents array shape: {currents.shape}")
 
-    num_sources = min(cfg.num_sources, N_c) # Number of points to activate
-    source_indices = random.sample(range(N_c), num_sources) # Indices of points (0 to N_c-1)
+    num_sources = min(cfg.num_sources, N_c)  # Number of points to activate
+    source_indices = random.sample(range(N_c), num_sources)  # Indices of points (0 to N_c-1)
 
     amplitudes = np.random.lognormal(mean=0, sigma=cfg.amplitude_sigma, size=num_sources)
     phases = np.random.uniform(0, 2 * np.pi, size=num_sources)
 
-    logger.info(f"Assigning random currents to {num_sources} source points (first tangent component)...")
+    logger.info(f"Assigning random currents to {num_sources} source points...")
     for i, point_idx in enumerate(source_indices):
-        # Assign to the first component (index 2*point_idx)
-        current_idx = 2 * point_idx
-        currents[current_idx] = amplitudes[i] * np.exp(1j * phases[i])
-        # Keep the second component (index 2*point_idx + 1) zero for simplicity
-        # currents[current_idx + 1] = 0.0 # Already zero initialized
+        value = amplitudes[i] * np.exp(1j * phases[i])
+        if cfg.use_vector_model:
+            # Assign to the first component (index 2*point_idx) for vector model
+            current_idx = 2 * point_idx
+            currents[current_idx] = value
+            # currents[current_idx + 1] = 0.0 # Keep second component zero
+        else:
+            # Assign directly to the point index for scalar model
+            currents[point_idx] = value
 
     # Ensure at least one source if num_sources was 0 or less
     if num_sources <= 0 and N_c > 0:
         logger.warning("num_sources <= 0, activating the first component of the first point.")
-        currents[0] = 1.0 # Activate first component of first point
+        currents[0] = 1.0  # Activate first point (or first component if vector)
 
     # Get measurement direction from config
     try:
@@ -146,9 +186,8 @@ def main(cfg: DictConfig) -> None:
         logger.error("Config missing 'measurement_direction'. Using default [0, 1, 0].")
         measurement_direction = np.array([0.0, 1.0, 0.0])
     except Exception as e:
-         logger.error(f"Error processing measurement_direction: {e}. Using default [0, 1, 0].")
-         measurement_direction = np.array([0.0, 1.0, 0.0])
-
+        logger.error(f"Error processing measurement_direction: {e}. Using default [0, 1, 0].")
+        measurement_direction = np.array([0.0, 1.0, 0.0])
 
     logger.info("Creating measurement plane...")
     x = np.linspace(-cfg.plane_size / 2, cfg.plane_size / 2, cfg.resolution)
@@ -158,23 +197,68 @@ def main(cfg: DictConfig) -> None:
 
     k = 2 * np.pi / cfg.wavelength
 
-    logger.info("Creating channel matrix...")
-    H = create_channel_matrix(points, tangents1, tangents2, measurement_plane, measurement_direction, k)
+    logger.info("Creating channel matrix for ground truth field (H_true)...")
+    H_true = create_channel_matrix(
+        points=points_true,  # Use true points
+        measurement_plane=measurement_plane,
+        k=k,
+        use_vector_model=cfg.use_vector_model,
+        tangents1=tangents1_true if cfg.use_vector_model else None,
+        tangents2=tangents2_true if cfg.use_vector_model else None,
+        measurement_direction=measurement_direction if cfg.use_vector_model else None,
+    )
+    logger.info(f"H_true shape: {H_true.shape}")
+
+    if cfg.get("perturb_points", False):
+        logger.info(
+            "Creating channel matrix for reconstruction (H_measured) using perturbed points..."
+        )
+        H_measured = create_channel_matrix(
+            points=points_perturbed,  # Use perturbed points
+            measurement_plane=measurement_plane,
+            k=k,
+            use_vector_model=cfg.use_vector_model,
+            tangents1=tangents1_perturbed
+            if cfg.use_vector_model
+            else None,  # Use potentially perturbed tangents
+            tangents2=tangents2_perturbed
+            if cfg.use_vector_model
+            else None,  # Use potentially perturbed tangents
+            measurement_direction=measurement_direction if cfg.use_vector_model else None,
+        )
+        logger.info(f"H_measured shape: {H_measured.shape}")
+    else:
+        logger.info("Using H_true as H_measured (no perturbation).")
+        H_measured = H_true  # If not perturbing, measured is same as true
 
     logger.info("Calculating ground truth field...")
-    true_field = compute_fields(points, tangents1, tangents2, currents, measurement_plane, measurement_direction, k, H)
+    true_field = compute_fields(
+        points=points_true,  # Use true points for ground truth field
+        currents=currents,
+        measurement_plane=measurement_plane,
+        k=k,
+        use_vector_model=cfg.use_vector_model,
+        tangents1=tangents1_true if cfg.use_vector_model else None,  # Use true tangents
+        tangents2=tangents2_true if cfg.use_vector_model else None,  # Use true tangents
+        measurement_direction=measurement_direction if cfg.use_vector_model else None,
+        channel_matrix=H_true,  # Use true channel matrix
+    )
 
     true_field_2d = true_field.reshape(cfg.resolution, cfg.resolution)
 
     measured_magnitude = np.abs(true_field)  # Use magnitude from synthetic true field
     measured_magnitude_2d = measured_magnitude.reshape(cfg.resolution, cfg.resolution)
 
-    logger.info("Running holographic phase retrieval with perturbation strategies...")
+    logger.info("Running holographic phase retrieval...")
 
-    # Note: holographic_phase_retrieval now receives H with shape (N_m, 2*N_c)
-    # It needs to solve for cluster_coefficients of shape (2*N_c,)
-    # We assume the implementation in gerchberg_saxton.py handles this correctly.
-    hpr_result = holographic_phase_retrieval(cfg, H, measured_magnitude, output_dir=output_dir) # Pass output_dir
+    # Pass necessary info to HPR. Assume HPR internally handles scalar/vector based on H shape.
+    # Alternatively, HPR might need the flag explicitly. Assuming the former for now.
+    hpr_result = holographic_phase_retrieval(
+        cfg=cfg,
+        channel_matrix=H_measured,  # Use the (potentially perturbed) measured channel matrix
+        measured_magnitude=measured_magnitude,  # Magnitude comes from the true field
+        output_dir=output_dir,
+    )
 
     if cfg.return_history:
         cluster_coefficients, coefficient_history, field_history, stats = hpr_result
@@ -209,8 +293,8 @@ def main(cfg: DictConfig) -> None:
         if not cfg.no_anim:
             logger.info("Creating GS iteration animation...")
             visualize_iteration_history(
-                points,
-                H,
+                points_perturbed,  # Visualize based on the geometry used for reconstruction
+                H_measured,  # Use the measured channel matrix
                 coefficient_history,
                 field_history,
                 cfg.resolution,
@@ -218,10 +302,10 @@ def main(cfg: DictConfig) -> None:
                 show_plot=(cfg.show_plot and not cfg.no_plot),
                 output_file=None,
                 animation_filename=os.path.join(output_dir, "gs_animation.gif"),
-                frame_skip=10, # Increased frame skip for faster animation
+                frame_skip=10,  # Increased frame skip for faster animation
                 perturbation_iterations=stats.get("perturbation_iterations", []),
                 # Get stats from HPR result
-                restart_iterations=[], # No restarts in vanilla implementation
+                restart_iterations=[],  # No restarts in vanilla implementation
                 convergence_threshold=cfg.convergence_threshold,
                 measured_magnitude=measured_magnitude,
                 # Pass the measured magnitude for true error calculation
@@ -229,10 +313,10 @@ def main(cfg: DictConfig) -> None:
 
             logger.info("Creating enhanced 4-panel animation...")
             visualize_current_and_field_history(
-                points,
-                coefficient_history,
+                points_perturbed,  # Visualize currents relative to the perturbed points
+                coefficient_history,  # Coefficients are relative to H_measured basis
                 field_history,
-                true_field, # Pass the synthetic true field for comparison
+                true_field,  # Pass the synthetic true field for comparison
                 cfg.resolution,
                 measurement_plane,
                 show_plot=(cfg.show_plot and not cfg.no_plot),
@@ -250,7 +334,9 @@ def main(cfg: DictConfig) -> None:
         logger.info(f"  Best RMSE: {stats['best_rmse']:.6f}")
         logger.info(f"  Perturbations applied: {stats['num_perturbations']}")
 
-    reconstructed_field = reconstruct_field(H, cluster_coefficients)
+    reconstructed_field = reconstruct_field(
+        H_measured, cluster_coefficients
+    )  # Reconstruct using H_measured
     reconstructed_field_2d = reconstructed_field.reshape(cfg.resolution, cfg.resolution)
 
     def normalized_rmse(a, b):
@@ -271,8 +357,8 @@ def main(cfg: DictConfig) -> None:
     if not cfg.no_plot:
         logger.info("Generating final field comparison visualization...")
         visualize_fields(
-            points,
-            currents, # Note: This 'currents' is the ground truth (2*N_c,), might need adjustment in visualize_fields if it expects (N_c,)
+            points_perturbed,  # Show points used in reconstruction
+            currents,  # Ground truth currents (defined on true points, but visualize magnitude)
             measurement_plane,
             true_field_2d,
             measured_magnitude_2d,
@@ -280,7 +366,7 @@ def main(cfg: DictConfig) -> None:
             rmse,  # Calculated RMSE
             corr,  # Calculated Correlation
             show_plot=cfg.show_plot,
-            output_dir = output_dir
+            output_dir=output_dir,
         )
     else:
         logger.info("Plot generation disabled via no_plot flag")

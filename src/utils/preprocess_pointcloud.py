@@ -2,12 +2,13 @@ import argparse
 import logging
 import os
 import pickle
-import sys # Added sys import for potential path manipulation in imports
+import sys  # Added sys import for potential path manipulation in imports
 
 import numpy as np
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
+
 
 def get_tangent_vectors(normals: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """
@@ -30,15 +31,17 @@ def get_tangent_vectors(normals: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     # Handle potential zero-norm normals to avoid NaN/errors
     valid_normals_mask = norm_n.flatten() > 1e-9
     if not np.all(valid_normals_mask):
-        logger.warning(f"Found {np.sum(~valid_normals_mask)} zero-norm vectors in input normals. Tangents for these will be zero.")
+        logger.warning(
+            f"Found {np.sum(~valid_normals_mask)} zero-norm vectors in input normals. Tangents for these will be zero."
+        )
         # Initialize tangents to zero, they will remain zero for invalid normals
         t1 = np.zeros_like(normals)
         t2 = np.zeros_like(normals)
         # Proceed only with valid normals
         normals_valid = normals[valid_normals_mask]
         norm_n_valid = norm_n[valid_normals_mask]
-        if normals_valid.shape[0] == 0: # All normals were invalid
-             return t1, t2
+        if normals_valid.shape[0] == 0:  # All normals were invalid
+            return t1, t2
     else:
         normals_valid = normals
         norm_n_valid = norm_n
@@ -47,7 +50,7 @@ def get_tangent_vectors(normals: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
 
     # Define global axes
     global_up = np.array([0.0, 0.0, 1.0])
-    global_alt_up = np.array([0.0, 1.0, 0.0]) # Use Y if normal is aligned with Z
+    global_alt_up = np.array([0.0, 1.0, 0.0])  # Use Y if normal is aligned with Z
 
     # Calculate first tangent (t1) - aiming for horizontal alignment
     # t1 = cross(up, normal)
@@ -66,13 +69,14 @@ def get_tangent_vectors(normals: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         # This shouldn't happen with valid normals unless normal is zero, which is handled above.
         still_zero_mask = parallel_mask & (norm_t1 < 1e-9)
         if np.any(still_zero_mask):
-             # This case implies the normal itself was likely zero or near-zero
-             logger.warning(f"Tangent calculation resulted in zero vector for {np.sum(still_zero_mask)} normals (potentially zero normals). Assigning arbitrary tangents.")
-             # Assign arbitrary orthogonal vectors if needed, though they should remain zero from init
-             # For safety, explicitly set them, although this indicates an issue upstream
-             t1_valid[still_zero_mask] = np.array([1.0, 0.0, 0.0])
-             norm_t1[still_zero_mask] = 1.0
-
+            # This case implies the normal itself was likely zero or near-zero
+            logger.warning(
+                f"Tangent calculation resulted in zero vector for {np.sum(still_zero_mask)} normals (potentially zero normals). Assigning arbitrary tangents."
+            )
+            # Assign arbitrary orthogonal vectors if needed, though they should remain zero from init
+            # For safety, explicitly set them, although this indicates an issue upstream
+            t1_valid[still_zero_mask] = np.array([1.0, 0.0, 0.0])
+            norm_t1[still_zero_mask] = 1.0
 
     # Normalize t1
     t1_valid /= np.maximum(norm_t1[:, np.newaxis], 1e-10)
@@ -130,7 +134,9 @@ def preprocess_pointcloud(input_path: str, output_path: str):
     num_cols = data.shape[1]
 
     if num_cols == 13:
-        logger.info("Data already has 13 columns. Assuming tangents are precalculated. Saving as is.")
+        logger.info(
+            "Data already has 13 columns. Assuming tangents are precalculated. Saving as is."
+        )
         output_data = data
     elif num_cols == 7:
         logger.info("Data has 7 columns. Calculating tangent vectors...")
@@ -160,19 +166,16 @@ def preprocess_pointcloud(input_path: str, output_path: str):
     except Exception as e:
         logger.error(f"Failed to save pickle file: {e}")
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Preprocess point cloud data by adding tangent vectors."
     )
     parser.add_argument(
-        "input_file",
-        type=str,
-        help="Path to the input .pkl file (expected N x 7 array)."
+        "input_file", type=str, help="Path to the input .pkl file (expected N x 7 array)."
     )
     parser.add_argument(
-        "output_file",
-        type=str,
-        help="Path to save the output .pkl file (will be N x 13 array)."
+        "output_file", type=str, help="Path to save the output .pkl file (will be N x 13 array)."
     )
     args = parser.parse_args()
 

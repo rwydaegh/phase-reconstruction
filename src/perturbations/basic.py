@@ -32,7 +32,7 @@ def apply_basic_perturbation(
     if perturbation_norm > 1e-10:
         perturbation = perturbation * field_norm * perturbation_intensity / perturbation_norm
     else:
-        perturbation = np.zeros_like(field_values) # No perturbation if norm is zero
+        perturbation = np.zeros_like(field_values)  # No perturbation if norm is zero
 
     # Apply perturbation
     perturbed_values = field_values + perturbation
@@ -42,7 +42,7 @@ def apply_basic_perturbation(
     if field_norm > 1e-10:
         relative_perturbation = perturbation_magnitude / field_norm
     else:
-        relative_perturbation = 0.0 # Avoid division by zero if field_norm is zero
+        relative_perturbation = 0.0  # Avoid division by zero if field_norm is zero
 
     logger.info(
         f"Iter {iteration}: Applied BASIC perturbation. "

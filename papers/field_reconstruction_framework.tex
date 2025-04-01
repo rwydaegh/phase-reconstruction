@@ -41,7 +41,7 @@ We propose a mathematical framework that accounts for these challenges and inves
 
 \subsection{Notation and Coordinate Systems}
 
-Let us denote the 3D point cloud of the environment as $\mathcal{P} = \{(x_i, y_i, z_i) \in \mathbb{R}^3 : i = 1, 2, \ldots, N_p\}$, where $N_p$ is the number of points. 
+Let us denote the 3D point cloud of the environment as $\mathcal{P} = \{(x_i, y_i, z_i) \in \mathbb{R}^3 : i = 1, 2, \ldots, N_p\}$, where $N_p$ is the number of points.
 
 The 2D measurement plane is defined as a rectangle $\mathcal{M} = \{(x, y, z) \in \mathbb{R}^3 : (x, y) \in [x_{\min}, x_{\max}] \times [y_{\min}, y_{\max}], z = z_0\}$, where $z_0$ is the height of the plane.
 
@@ -135,7 +135,7 @@ Since the wall surfaces are not planar, we need a method to project the currents
 
 \begin{enumerate}
     \item \textbf{Equivalent Source Method:} Replace the actual current distribution with an equivalent set of sources on a planar surface that produces the same field on the measurement plane.
-    
+
     \item \textbf{Piecewise Planar Approximation:} Divide the environment into piecewise planar segments, apply ASM for each segment, and superimpose the results.
 \end{enumerate}
 
@@ -306,13 +306,13 @@ For large-scale problems, direct implementation of the proposed framework may be
 
 \begin{itemize}
     \item \textbf{Angular Spectrum Method (ASM):} As elaborated in Section 5, ASM provides a highly efficient approach for field propagation by leveraging FFT-based algorithms. The computational complexity is reduced from $O(N^2)$ for direct Green's function evaluation to $O(N \log N)$ for ASM, providing orders of magnitude speedup for large problems.
-    
+
     \item \textbf{Fast multipole methods (FMM):} For cases where ASM may not be directly applicable (such as highly irregular geometries), FMM can efficiently compute Green's function interactions with $O(N \log N)$ complexity.
-    
+
     \item \textbf{Hybrid ASM-Green's function approach:} We can leverage ASM for the regular parts of the geometry (such as propagation between parallel planes) and use the Green's function for irregular elements, combining the advantages of both methods.
-    
+
     \item \textbf{GPU acceleration:} Both ASM and FMM approaches can be significantly accelerated using GPU implementations, particularly for the FFT operations in ASM.
-    
+
     \item \textbf{Model order reduction techniques:} For parametric studies or real-time applications.
 \end{itemize}
 

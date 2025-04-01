@@ -130,12 +130,12 @@ File: pdftex.def 2022/09/22 v1.2b Graphics/color driver for pdftex
 \Gin@req@width=\dimen151
 )
 (C:\Users\rwydaegh\AppData\Local\Programs\MiKTeX\tex/latex/physics\physics.sty
-Package: physics 
+Package: physics
 
 (C:\Users\rwydaegh\AppData\Local\Programs\MiKTeX\tex/latex/l3packages/xparse\xp
 arse.sty
 (C:\Users\rwydaegh\AppData\Local\Programs\MiKTeX\tex/latex/l3kernel\expl3.sty
-Package: expl3 2024-01-04 L3 programming layer (loader) 
+Package: expl3 2024-01-04 L3 programming layer (loader)
 
 (C:\Users\rwydaegh\AppData\Local\Programs\MiKTeX\tex/latex/l3backend\l3backend-
 pdftex.def
@@ -206,7 +206,7 @@ Package: ifthen 2022/04/13 v1.1d Standard LaTeX ifthen package (DPC)
 )
 (C:\Users\rwydaegh\AppData\Local\Programs\MiKTeX\tex/latex/algorithmicx\algpseu
 docode.sty
-Package: algpseudocode 
+Package: algpseudocode
 
 (C:\Users\rwydaegh\AppData\Local\Programs\MiKTeX\tex/latex/algorithmicx\algorit
 hmicx.sty
@@ -819,12 +819,12 @@ Please type another file name for output: test
 
 Package siunitx Warning: Detected the "physics" package:
 (siunitx)                omitting definition of \qty.
-(siunitx)                
+(siunitx)
 (siunitx)                If you want to use \qty with the siunitx definition,
-(siunitx)                add 
-(siunitx)                
+(siunitx)                add
+(siunitx)
 (siunitx)                    \AtBeginDocument{\RenewCommandCopy\qty\SI}
-(siunitx)                
+(siunitx)
 (siunitx)                to your preamble.
 
 
@@ -853,7 +853,7 @@ File: umsb.fd 2013/01/14 v3.01 AMS symbols B
 wydaegh/AppData/Local/Programs/MiKTeX/fonts/enc/dvips/cm-super/cm-super-ts1.enc
 }] [2]
 Overfull \hbox (2.93343pt too wide) in paragraph at lines 90--91
-[]\OT1/cmr/m/n/12 For prac-ti-cal ap-pli-ca-tions in com-plex en-vi-ron-ments, 
+[]\OT1/cmr/m/n/12 For prac-ti-cal ap-pli-ca-tions in com-plex en-vi-ron-ments,
 we can use the method
  []
 
@@ -871,7 +871,7 @@ Package hyperref Info: bookmark level for unknown algorithm defaults to 0 on in
 put line 223.
 
 Overfull \hbox (8.6038pt too wide) in paragraph at lines 234--234
-[]\OT1/cmr/bx/n/17.28 Compensation for Ge-o-met-ric Mis-align-ments 
+[]\OT1/cmr/bx/n/17.28 Compensation for Ge-o-met-ric Mis-align-ments
  []
 
 [6] [7] [8] [9] [10] [11] (field_reconstruction_framework.aux)
@@ -890,7 +890,7 @@ Package rerunfilecheck Info: Checksums for `field_reconstruction_framework.out'
 :
 (rerunfilecheck)             Before: DECBB059603C0B1D7DE9E76969F3B430;5277
 (rerunfilecheck)             After:  6BABD72C3BC4847C3BDA8948704AF31F;6869.
- ) 
+ )
 Here is how much of TeX's memory you used:
  26109 strings out of 474485
  531016 string characters out of 5742319
@@ -944,4 +944,3 @@ PDF statistics:
  294 PDF objects out of 1000 (max. 8388607)
  75 named destinations out of 1000 (max. 500000)
  205 words of extra memory for PDF output out of 10000 (max. 10000000)
-

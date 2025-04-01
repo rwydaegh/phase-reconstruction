@@ -23,9 +23,10 @@ def test_apply_basic_perturbation_shape_and_type():
     assert perturbed_values.shape == field_values.shape
     assert perturbed_values.dtype == np.complex128 or perturbed_values.dtype == np.complex64
 
+
 def test_apply_basic_perturbation_changes_values():
     """Test if the perturbation actually changes the values (for non-zero intensity)."""
-    field_values = np.ones((10, 10), dtype=complex) * (1+1j)
+    field_values = np.ones((10, 10), dtype=complex) * (1 + 1j)
     iteration = 1
     intensity = 0.1
     perturbed_values = apply_basic_perturbation(field_values, iteration, intensity)
@@ -33,15 +34,17 @@ def test_apply_basic_perturbation_changes_values():
     # Check that the output is not identical to the input
     assert not np.allclose(perturbed_values, field_values)
 
+
 def test_apply_basic_perturbation_zero_intensity():
     """Test if zero intensity results in no change."""
-    field_values = np.ones((10, 10), dtype=complex) * (1+1j)
+    field_values = np.ones((10, 10), dtype=complex) * (1 + 1j)
     iteration = 1
     intensity = 0.0
     perturbed_values = apply_basic_perturbation(field_values, iteration, intensity)
 
     # Check that the output is identical to the input
     assert np.allclose(perturbed_values, field_values)
+
 
 def test_apply_basic_perturbation_zero_field():
     """Test handling of zero input field."""

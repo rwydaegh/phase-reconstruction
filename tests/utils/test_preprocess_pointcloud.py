@@ -1,12 +1,15 @@
 import numpy as np
 import pytest
-from omegaconf import OmegaConf # Using OmegaConf for config simulation
+from omegaconf import OmegaConf  # Using OmegaConf for config simulation
+
+from src.create_test_pointcloud import create_test_pointcloud
+
+# Import the new geometry utility function
+from src.utils.geometry_utils import get_cube_normals
 
 # Adjust the import path based on the file location within the project structure
 from src.utils.preprocess_pointcloud import get_tangent_vectors
-from src.create_test_pointcloud import create_test_pointcloud
-# Import the new geometry utility function
-from src.utils.geometry_utils import get_cube_normals
+
 
 def test_get_tangent_vectors_generated_cube():
     """
@@ -16,10 +19,10 @@ def test_get_tangent_vectors_generated_cube():
     """
     # Create a simple config for the test point cloud
     cfg_dict = {
-        'room_size': 2.0,
-        'wall_points': 5, # Use a small number for faster testing
-        'perturb_points': False,
-        'verbose': False # Suppress print statements from create_test_pointcloud
+        "room_size": 2.0,
+        "wall_points": 5,  # Use a small number for faster testing
+        "perturb_points": False,
+        "verbose": False,  # Suppress print statements from create_test_pointcloud
     }
     cfg = OmegaConf.create(cfg_dict)
 
@@ -30,7 +33,9 @@ def test_get_tangent_vectors_generated_cube():
     # Get filtered points and their corresponding inward normals using the utility function
     points_on_face, normals_on_face = get_cube_normals(initial_points, cfg.room_size)
 
-    assert points_on_face.shape[0] > 0, "No points found strictly on single faces by get_cube_normals"
+    assert (
+        points_on_face.shape[0] > 0
+    ), "No points found strictly on single faces by get_cube_normals"
     # Verification of normal calculation is implicitly done within get_cube_normals
 
     # Calculate tangents for the filtered normals
@@ -38,8 +43,12 @@ def test_get_tangent_vectors_generated_cube():
 
     # --- Assertions (on filtered data) ---
     # 1. Check shapes
-    assert t1.shape == normals_on_face.shape, f"Expected t1 shape {normals_on_face.shape}, got {t1.shape}"
-    assert t2.shape == normals_on_face.shape, f"Expected t2 shape {normals_on_face.shape}, got {t2.shape}"
+    assert (
+        t1.shape == normals_on_face.shape
+    ), f"Expected t1 shape {normals_on_face.shape}, got {t1.shape}"
+    assert (
+        t2.shape == normals_on_face.shape
+    ), f"Expected t2 shape {normals_on_face.shape}, got {t2.shape}"
 
     # 2. Check for NaN values
     assert not np.isnan(t1).any(), "Found NaN values in t1"
@@ -53,37 +62,43 @@ def test_get_tangent_vectors_generated_cube():
     assert np.allclose(norm_t2, 1.0, atol=tolerance), f"t2 vectors are not normalized: {norm_t2}"
 
     # 4. Check orthogonality using dot products (element-wise)
-    dot_n_t1 = np.einsum('ij,ij->i', normals_on_face, t1)
-    dot_n_t2 = np.einsum('ij,ij->i', normals_on_face, t2)
-    dot_t1_t2 = np.einsum('ij,ij->i', t1, t2)
+    dot_n_t1 = np.einsum("ij,ij->i", normals_on_face, t1)
+    dot_n_t2 = np.einsum("ij,ij->i", normals_on_face, t2)
+    dot_t1_t2 = np.einsum("ij,ij->i", t1, t2)
 
     ortho_tolerance = 1e-9
-    assert np.all(np.abs(dot_n_t1) < ortho_tolerance), f"Normals and t1 are not orthogonal: max dot product {np.max(np.abs(dot_n_t1))}"
-    assert np.all(np.abs(dot_n_t2) < ortho_tolerance), f"Normals and t2 are not orthogonal: max dot product {np.max(np.abs(dot_n_t2))}"
-    assert np.all(np.abs(dot_t1_t2) < ortho_tolerance), f"t1 and t2 are not orthogonal: max dot product {np.max(np.abs(dot_t1_t2))}"
+    assert np.all(
+        np.abs(dot_n_t1) < ortho_tolerance
+    ), f"Normals and t1 are not orthogonal: max dot product {np.max(np.abs(dot_n_t1))}"
+    assert np.all(
+        np.abs(dot_n_t2) < ortho_tolerance
+    ), f"Normals and t2 are not orthogonal: max dot product {np.max(np.abs(dot_n_t2))}"
+    assert np.all(
+        np.abs(dot_t1_t2) < ortho_tolerance
+    ), f"t1 and t2 are not orthogonal: max dot product {np.max(np.abs(dot_t1_t2))}"
 
 
 def test_get_tangent_vectors_edge_cases():
-    """ Tests edge cases like zero normals or normals parallel to calculation axes. """
+    """Tests edge cases like zero normals or normals parallel to calculation axes."""
     # Normal parallel to initial axis ([0,0,1])
     normals_z = np.array([[0.0, 0.0, 1.0]])
     t1_z, t2_z = get_tangent_vectors(normals_z)
-    assert np.allclose(np.abs(np.einsum('ij,ij->i', normals_z, t1_z)), 0.0)
-    assert np.allclose(np.abs(np.einsum('ij,ij->i', normals_z, t2_z)), 0.0)
-    assert np.allclose(np.abs(np.einsum('ij,ij->i', t1_z, t2_z)), 0.0)
-    assert np.allclose(t1_z[0, 2], 0.0) # Should lie in XY plane
-    assert np.allclose(t2_z[0, 2], 0.0) # Should lie in XY plane
+    assert np.allclose(np.abs(np.einsum("ij,ij->i", normals_z, t1_z)), 0.0)
+    assert np.allclose(np.abs(np.einsum("ij,ij->i", normals_z, t2_z)), 0.0)
+    assert np.allclose(np.abs(np.einsum("ij,ij->i", t1_z, t2_z)), 0.0)
+    assert np.allclose(t1_z[0, 2], 0.0)  # Should lie in XY plane
+    assert np.allclose(t2_z[0, 2], 0.0)  # Should lie in XY plane
 
     # Normal parallel to fallback axis ([1,0,0]) - relevant if initial axis was also [1,0,0]
     # Our current logic uses Z then X, so this case isn't strictly hit by the fallback,
     # but it's good to test axes alignment.
     normals_x = np.array([[1.0, 0.0, 0.0]])
     t1_x, t2_x = get_tangent_vectors(normals_x)
-    assert np.allclose(np.abs(np.einsum('ij,ij->i', normals_x, t1_x)), 0.0)
-    assert np.allclose(np.abs(np.einsum('ij,ij->i', normals_x, t2_x)), 0.0)
-    assert np.allclose(np.abs(np.einsum('ij,ij->i', t1_x, t2_x)), 0.0)
-    assert np.allclose(t1_x[0, 0], 0.0) # Should lie in YZ plane
-    assert np.allclose(t2_x[0, 0], 0.0) # Should lie in YZ plane
+    assert np.allclose(np.abs(np.einsum("ij,ij->i", normals_x, t1_x)), 0.0)
+    assert np.allclose(np.abs(np.einsum("ij,ij->i", normals_x, t2_x)), 0.0)
+    assert np.allclose(np.abs(np.einsum("ij,ij->i", t1_x, t2_x)), 0.0)
+    assert np.allclose(t1_x[0, 0], 0.0)  # Should lie in YZ plane
+    assert np.allclose(t2_x[0, 0], 0.0)  # Should lie in YZ plane
 
     # Test with empty input
     normals_empty = np.empty((0, 3))

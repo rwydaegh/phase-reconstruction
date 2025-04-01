@@ -11,10 +11,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import LogNorm, Normalize
 
+
 def enhance_sensitivity_visualization(output_dir="sensitivity_results", save_dir="figs"):
     """Create enhanced visualizations of sensitivity analysis results."""
     # Configure logging inside the function
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
     logger = logging.getLogger(__name__)
     # Ensure output directory exists
     os.makedirs(save_dir, exist_ok=True)
@@ -23,8 +26,7 @@ def enhance_sensitivity_visualization(output_dir="sensitivity_results", save_dir
     try:
         all_files = os.listdir(output_dir)
         npz_files = [
-            f for f in all_files
-            if f.startswith("sensitivity_") and f.endswith("_data.npz")
+            f for f in all_files if f.startswith("sensitivity_") and f.endswith("_data.npz")
         ]
         if not npz_files:
             logger.warning(f"No sensitivity data files (*_data.npz) found in {output_dir}")
@@ -37,15 +39,17 @@ def enhance_sensitivity_visualization(output_dir="sensitivity_results", save_dir
     # Create a figure for summary visualization
     # Adjust summary plot size based on the number of files found
     num_plots = len(npz_files)
-    ncols = min(num_plots, 3) # Max 3 columns
+    ncols = min(num_plots, 3)  # Max 3 columns
     nrows = (num_plots + ncols - 1) // ncols
-    fig_summary, ax_summary = plt.subplots(nrows, ncols, figsize=(6 * ncols, 6 * nrows), squeeze=False)
+    fig_summary, ax_summary = plt.subplots(
+        nrows, ncols, figsize=(6 * ncols, 6 * nrows), squeeze=False
+    )
     ax_summary_flat = ax_summary.flatten()
 
     for i, npz_file in enumerate(npz_files):
         file_path = os.path.join(output_dir, npz_file)
         if not os.path.exists(file_path):
-            logger.warning(f"File not found, skipping: {file_path}") # Adjusted message slightly
+            logger.warning(f"File not found, skipping: {file_path}")  # Adjusted message slightly
             continue
 
         # Load data
@@ -66,11 +70,13 @@ def enhance_sensitivity_visualization(output_dir="sensitivity_results", save_dir
         # Add to summary plot
         # Add to summary plot using the flattened axes array
         if i < len(ax_summary_flat):
-             plot_summary_subplot(ax_summary_flat[i], X, Y, rmse, correlation, param1_name, param2_name)
+            plot_summary_subplot(
+                ax_summary_flat[i], X, Y, rmse, correlation, param1_name, param2_name
+            )
 
     # Hide any unused subplots in the summary figure
     for j in range(i + 1, len(ax_summary_flat)):
-        ax_summary_flat[j].axis('off')
+        ax_summary_flat[j].axis("off")
 
     # Finalize and save summary plot
     plt.tight_layout()
@@ -79,7 +85,7 @@ def enhance_sensitivity_visualization(output_dir="sensitivity_results", save_dir
     plt.close(fig_summary)
     logger.info(f"Summary plot saved to {summary_filename}")
 
-    logger.info(f"Enhanced visualizations saved to {save_dir}") # Use logger instead of print
+    logger.info(f"Enhanced visualizations saved to {save_dir}")  # Use logger instead of print
 
 
 def create_enhanced_rmse_plot(X, Y, rmse, param1_name, param2_name, save_dir):

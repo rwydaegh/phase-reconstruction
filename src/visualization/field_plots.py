@@ -86,21 +86,29 @@ def visualize_fields(
     # Color points by current magnitude with improved visualization
     # Calculate combined magnitude per point from the two components in 'currents'
     if currents.shape[0] == 2 * points.shape[0]:
-        coeffs_t1 = currents[0::2]      # Shape (N_c,)
-        coeffs_t2 = currents[1::2]      # Shape (N_c,)
-        current_mags_per_point = np.sqrt(np.abs(coeffs_t1)**2 + np.abs(coeffs_t2)**2) # Shape (N_c,)
+        coeffs_t1 = currents[0::2]  # Shape (N_c,)
+        coeffs_t2 = currents[1::2]  # Shape (N_c,)
+        current_mags_per_point = np.sqrt(
+            np.abs(coeffs_t1) ** 2 + np.abs(coeffs_t2) ** 2
+        )  # Shape (N_c,)
     elif currents.shape[0] == points.shape[0]:
-         # Handle case where scalar currents might still be passed (e.g., from older data)
-         logger.warning("visualize_fields received currents with shape matching points, assuming scalar values.")
-         current_mags_per_point = np.abs(currents)
+        # Handle case where scalar currents might still be passed (e.g., from older data)
+        logger.warning(
+            "visualize_fields received currents with shape matching points, assuming scalar values."
+        )
+        current_mags_per_point = np.abs(currents)
     else:
-         raise ValueError(f"Shape mismatch: currents shape {currents.shape} not compatible with points shape {points.shape}")
+        raise ValueError(
+            f"Shape mismatch: currents shape {currents.shape} not compatible with points shape {points.shape}"
+        )
 
     if current_mags_per_point.shape[0] != points.shape[0]:
-         raise ValueError(f"Mismatch between points ({points.shape[0]}) and calculated current magnitudes ({current_mags_per_point.shape[0]})")
+        raise ValueError(
+            f"Mismatch between points ({points.shape[0]}) and calculated current magnitudes ({current_mags_per_point.shape[0]})"
+        )
 
     max_mag = np.max(current_mags_per_point)
-    if max_mag > 1e-9: # Use a small tolerance
+    if max_mag > 1e-9:  # Use a small tolerance
         normalized_mags = current_mags_per_point / max_mag
         sizes = 0.5 + 150 * normalized_mags**2
         alphas = 0.2 + 0.8 * normalized_mags
@@ -112,7 +120,7 @@ def visualize_fields(
         points[:, 0],
         points[:, 1],
         points[:, 2],
-        c=current_mags_per_point, # Use combined magnitude for color
+        c=current_mags_per_point,  # Use combined magnitude for color
         s=sizes,
         cmap="plasma",
         alpha=alphas,

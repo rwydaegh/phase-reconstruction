@@ -1,7 +1,9 @@
 import logging
+
 import numpy as np
 
 logger = logging.getLogger(__name__)
+
 
 def get_cube_normals(points: np.ndarray, room_size: float) -> tuple[np.ndarray, np.ndarray]:
     """
@@ -27,11 +29,11 @@ def get_cube_normals(points: np.ndarray, room_size: float) -> tuple[np.ndarray, 
     # Assumes the point generation places points sufficiently close to the faces.
     for i, idx in enumerate(max_coord_indices):
         coord_value = points[i, idx]
-        if idx == 0: # Max is X
+        if idx == 0:  # Max is X
             normals[i, 0] = 1.0 if coord_value > 0 else -1.0
-        elif idx == 1: # Max is Y
+        elif idx == 1:  # Max is Y
             normals[i, 1] = 1.0 if coord_value > 0 else -1.0
-        else: # Max is Z
+        else:  # Max is Z
             normals[i, 2] = 1.0 if coord_value > 0 else -1.0
 
     # Verify that normals were assigned (check non-zero norms)

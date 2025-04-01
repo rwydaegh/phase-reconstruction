@@ -29,9 +29,10 @@ def test_momentum_perturbation_shape_and_type():
     assert perturbed_values.dtype == np.complex128 or perturbed_values.dtype == np.complex64
     assert new_momentum.dtype == np.complex128 or new_momentum.dtype == np.complex64
 
+
 def test_momentum_perturbation_changes_values():
     """Test if momentum perturbation changes values (non-zero intensity)."""
-    field_values = np.ones((10, 10), dtype=complex) * (1+1j)
+    field_values = np.ones((10, 10), dtype=complex) * (1 + 1j)
     iteration = 1
     intensity = 0.1
     current_error = 0.5
@@ -42,9 +43,10 @@ def test_momentum_perturbation_changes_values():
 
     assert not np.allclose(perturbed_values, field_values)
 
+
 def test_momentum_perturbation_zero_intensity():
     """Test if zero intensity results in no change."""
-    field_values = np.ones((10, 10), dtype=complex) * (1+1j)
+    field_values = np.ones((10, 10), dtype=complex) * (1 + 1j)
     iteration = 1
     intensity = 0.0
     current_error = 0.5
@@ -61,7 +63,7 @@ def test_momentum_perturbation_zero_intensity():
 
 def test_momentum_perturbation_with_previous_momentum():
     """Test if providing previous momentum influences the result."""
-    field_values = np.ones((5, 5), dtype=complex) * (1+1j)
+    field_values = np.ones((5, 5), dtype=complex) * (1 + 1j)
     iteration = 1
     intensity = 0.1
     current_error = 0.5

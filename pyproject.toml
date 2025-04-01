@@ -10,8 +10,7 @@ line-length = 100
 # Enable flake8-quotes `Q` codes by default.
 # Enable flake8-comprehensions `C4` codes by default.
 # Enable pyupgrade `UP` codes by default.
-select = ["E", "F", "W", "I", "B", "Q", "C4", "UP"]
-ignore = []
+# select and ignore moved to [tool.ruff.lint]
 
 # Allow unused variables when underscore-prefixed.
 # ignore = ["F841"]
@@ -50,8 +49,16 @@ exclude = [
 target-version = "py38"
 
 [tool.ruff.lint]
-# Allow unused variables in `__init__.py` files.
-ignore = ["F401"] # Ignore unused imports for now, can tighten later
+# Enable Pyflakes `E` and `F` codes by default.
+# Enable flake8-bugbear `B` codes by default.
+# Enable isort `I` codes by default.
+# Enable flake8-quotes `Q` codes by default.
+# Enable flake8-comprehensions `C4` codes by default.
+# Enable pyupgrade `UP` codes by default.
+select = ["E", "F", "W", "I", "B", "Q", "C4", "UP"]
+# Allow unused variables in `__init__.py` files (F401).
+# Ignore line too long errors (E501).
+ignore = ["F401", "E501"]
 
 [tool.ruff.format]
 # Like Black, use double quotes for strings.

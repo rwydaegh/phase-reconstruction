@@ -76,7 +76,7 @@ roo-code-settings.json
 **/*.pickle
 source_pointcloud.pkl
 
-# Large animation files 
+# Large animation files
 *.gif
 **/*.gif
 
@@ -97,5 +97,7 @@ perturbation_results/
 real_data_results/
 sensitivity_results/
 smoothing_results/
+outputs/
+multirun/
 
 **/__pycache__/

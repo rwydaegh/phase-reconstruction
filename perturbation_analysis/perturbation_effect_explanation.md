@@ -46,7 +46,7 @@ For practical digital twin applications, the choice depends on your primary goal
   - The physical accuracy of current sources is critical
   - You're using the model to understand the currents themselves
   - You have high confidence in your geometric model
-  
+
 - **Choose Current Optimization when**:
   - Field prediction accuracy is the primary goal
   - Your digital twin has known geometric inaccuracies

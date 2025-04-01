@@ -1,0 +1,55 @@
+# conf/perturbation_analysis.yaml
+
+# Inherit base settings if applicable (optional, can add later if needed)
+# defaults:
+#   - measured_data # Example: inherit from measured_data
+#   - _self_
+
+# --- Parameters specific to perturbation_analysis.py ---
+
+# Simulation Setup (from SimulationConfig defaults)
+wavelength: 10.7e-3
+plane_size: 1.0
+resolution: 30
+room_size: 2.0
+wall_points: 10
+num_sources: 50
+gs_iterations: 200
+convergence_threshold: 1e-3
+amplitude_sigma: 1.0
+use_vector_model: True # Default to vector model
+perturb_points: False # Default value, controlled by loop factor in script
+perturbation_factor: 0.0 # Default value, controlled by loop factor in script
+
+
+measurement_direction: [0.0, 1.0, 0.0] # Default Y-direction
+
+# HPR Algorithm Parameters (defaults added previously to SimulationConfig)
+adaptive_regularization: False
+regularization: 1e-4
+enable_perturbations: False # Refers to GS internal perturbations, keep False for this script
+stagnation_window: 50
+stagnation_threshold: 1e-5
+perturbation_intensity: 0.1 # Refers to GS internal perturbations
+perturbation_mode: "basic" # Refers to GS internal perturbations
+constraint_skip_iterations: 0
+momentum_factor: 0.5
+temperature: 1.0
+return_history: False # Don't need history for this analysis
+
+# Analysis Script Parameters (from parse_args defaults)
+perturbation_factors: "0.001,0.005,0.01" # Comma-separated list
+output_dir: "perturbation_analysis_hydra" # Default output directory
+random_seed: 42
+show_plots: False # Show plots instead of just saving them
+verbose: True
+no_plot: False # Duplicate of show_plots logic, keep for compatibility if needed
+
+# Hydra specific config
+hydra:
+  run:
+    # Use a simpler output structure for this specific analysis script
+    dir: outputs/perturbation_analysis/${now:%Y-%m-%d_%H-%M-%S}
+  job:
+    # Allow Hydra to change the working directory
+    chdir: True
