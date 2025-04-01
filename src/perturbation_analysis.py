@@ -10,6 +10,7 @@ import os
 import random
 import sys
 from dataclasses import dataclass, field
+from typing import List # Import List for type hinting
 
 import matplotlib.pyplot as plt
 import numpy as np
