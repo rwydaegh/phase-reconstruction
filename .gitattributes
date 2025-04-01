@@ -1,0 +1,5 @@
+# Auto detect text files and ensure they use LF line endings
+* text=auto eol=lf
+
+# Explicitly treat lock file as text with LF endings
+poetry.lock text eol=lf
