@@ -1,0 +1,29 @@
+# conf/fake_data.yaml
+
+# Default configuration for simulated_data_reconstruction.py (using simulated data)
+
+# Inherit from the base config.yaml, overriding specific values
+defaults:
+  - measured_data # Inherit from the base measured_data.yaml
+  - _self_        # Recommended for config composition
+
+# Override parameters for simulated data simulation
+resolution: 50
+use_source_pointcloud: False # Override to disable source point cloud for simulated data
+perturbation_factor: 0.02
+perturbation_mode: "basic" # Original default for simulated data
+enable_perturbations: False # Original default for simulated data
+stagnation_threshold: 1e-3 # Original default for simulated data
+enable_smoothing: False
+smoothing_radius_mm: 0.0
+
+# Note: source_pointcloud_path is irrelevant when use_source_pointcloud is False
+# Note: wall_points will be used to generate the simulated cloud
+
+# Add hydra specific config for output directories
+hydra:
+  run:
+    dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.num}

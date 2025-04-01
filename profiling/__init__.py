@@ -1,20 +1,14 @@
 """
-Profiling and performance optimization package for field reconstruction framework.
+New profiling and performance analysis package for the field reconstruction framework.
+
+This package provides tools for:
+- Profiling simulation runs using cProfile.
+- Benchmarking different components and optimizations.
+- Analyzing performance characteristics.
 """
 
-from .performance_optimization import (
-    disable_matplotlib,
-    profile_with_optimizations,
-)
+# Expose key functions or classes here as the package develops
+# e.g., from .profiler import run_profile
+# e.g., from .benchmarker import run_benchmarks
 
-# Benchmark utilities
-try:
-    from .benchmark_optimizations import (
-        run_all_benchmarks,
-        benchmark_channel_matrix,
-        benchmark_svd_methods,
-        benchmark_holographic_phase_retrieval,
-    )
-except ImportError:
-    # Benchmarking tools may have additional dependencies that aren't always available
-    pass
+__version__ = "0.1.0"

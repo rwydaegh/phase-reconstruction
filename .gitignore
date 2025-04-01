@@ -68,6 +68,7 @@ Thumbs.db
 # Project specific
 *.log
 
+roo-code-settings.json
 # Large data files
 *.pkl
 *.pickle
@@ -91,9 +92,10 @@ source_pointcloud.pkl
 
 # Specific large directories with their contents
 cube_environment_results/
-measurement_data/
 perturbation_animations/
 perturbation_results/
 real_data_results/
 sensitivity_results/
 smoothing_results/
+
+**/__pycache__/
