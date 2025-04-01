@@ -19,7 +19,7 @@ def basic_config() -> DictConfig:
     """Provides a basic Hydra config loaded from defaults for component testing."""
     with hydra.initialize(config_path="../conf", version_base=None):
         # Load the default config and override specific values for testing
-        cfg = hydra.compose(config_name="config", overrides=[
+        cfg = hydra.compose(config_name="measured_data", overrides=[
             "resolution=10",
             "plane_size=0.5",
             "wavelength=0.01", # 30 GHz
@@ -166,7 +166,7 @@ def gs_setup(basic_config: DictConfig): # Use basic_config to get wavelength etc
     # or we can override specific GS params if necessary.
     # Let's create a dedicated GS config by composing again.
     with hydra.initialize(config_path="../conf", version_base=None):
-        cfg = hydra.compose(config_name="config", overrides=[
+        cfg = hydra.compose(config_name="measured_data", overrides=[
             # Inherit most from basic_config's overrides if possible,
             # or set specific GS test values here.
             # Let's assume basic_config is sufficient for now, but add GS specific overrides:

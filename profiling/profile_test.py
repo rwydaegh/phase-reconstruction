@@ -7,7 +7,7 @@ import sys
 # Add parent directory to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import main  # Import the main module
+import simulated_data_reconstruction  # Import the renamed main module
 from profiling.performance_optimization import disable_matplotlib, profile_with_optimizations
 from src.simulation_config_real_data import SimulationConfig
 

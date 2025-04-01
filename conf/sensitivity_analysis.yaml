@@ -1,7 +1,7 @@
 # conf/sensitivity_analysis.yaml
 
 defaults:
-  - base_simulation: fake_data # Choose default simulation config (fake_data or config)
+  - base_simulation: simulated_data # Choose default simulation config (simulated_data or measured_data)
   - _self_ # Allows overriding parameters defined here
 
 # Parameters specific to sensitivity analysis execution
