@@ -17,8 +17,6 @@ from create_channel_matrix import create_channel_matrix
 from create_test_pointcloud import create_test_pointcloud
 from holographic_phase_retrieval import holographic_phase_retrieval
 
-# Import from the project
-from src.simulation_config_real_data import SimulationConfig
 from utils.normalized_correlation import normalized_correlation
 from utils.normalized_rmse import normalized_rmse
 from src.visualization.utils import visualize_field
@@ -30,7 +28,6 @@ def parse_args():
         description="Analyze perturbation effect on field reconstruction"
     )
 
-    # Perturbation settings
     parser.add_argument(
         "--perturbation-factors",
         type=str,
@@ -106,14 +103,11 @@ def generate_currents(points, num_sources, random_generator, config):
     currents = np.zeros(len(points), dtype=complex)
     num_sources = min(num_sources, len(currents))
 
-    # Sample indices using the provided random generator
     source_indices = random_generator.sample(range(len(currents)), num_sources)
 
-    # Generate amplitudes and phases using numpy's random with the same seed
     amplitudes = np.random.lognormal(mean=0, sigma=config.amplitude_sigma, size=num_sources)
     phases = np.random.uniform(0, 2 * np.pi, size=num_sources)
 
-    # Set complex currents
     for i, idx in enumerate(source_indices):
         currents[idx] = amplitudes[i] * np.exp(1j * phases[i])
 
@@ -407,47 +401,34 @@ def main():
     """Main function to analyze perturbation effect"""
     args = parse_args()
 
-    # Parse perturbation factors
     try:
         perturbation_factors = [float(f) for f in args.perturbation_factors.split(",")]
     except ValueError:
         print("Error: Perturbation factors must be comma-separated numbers")
         return
 
-    # Create output directory
     os.makedirs(args.output_dir, exist_ok=True)
 
-    # Set random seed for reproducibility
     random.seed(args.random_seed)
     np.random.seed(args.random_seed)
 
-    # Create a random number generator for current source indices
-    # This ensures we use the same source positions across all perturbation factors
     rng = random.Random(args.random_seed)
 
-    # Results for each perturbation factor
     all_results = []
 
-    # For the first factor (which should be 0), save the original points and currents
     original_points = None
     original_currents = None
     original_source_indices = None
 
-    # Run simulations for each perturbation factor
     for factor in perturbation_factors:
         print(f"\n--- Testing perturbation factor {factor} ---")
 
-        # Create configuration for this factor
-        config = setup_simulation(args, factor)
 
-        # Create perturbed point cloud
         perturbed_points = create_test_pointcloud(config)
 
-        # For the first run (factor=0), save as original
         if original_points is None:
             original_points = perturbed_points.copy()
 
-            # Generate currents for original points
             original_currents, original_source_indices, amplitudes, phases = generate_currents(
                 original_points, args.num_sources, rng, config
             )
@@ -459,22 +440,17 @@ def main():
                 # Actually use the same amplitude and phase as original
                 perturbed_currents[idx] = original_currents[idx]
 
-        # Create measurement plane (same for all simulations)
         measurement_plane, x, y = create_measurement_plane(config)
 
-        # ----- COMPUTE TRUE FIELDS -----
 
-        # Compute true field with original points
         original_true_field, H_original = compute_field(
             original_points, original_currents, measurement_plane, config.k
         )
 
-        # Compute true field with perturbed points
         perturbed_true_field, H_perturbed = compute_field(
             perturbed_points, perturbed_currents, measurement_plane, config.k
         )
 
-        # Visualize true fields - only storing the data, not saving visualization images
         original_true_field_2d = np.abs(original_true_field).reshape(
             config.resolution, config.resolution
         )
@@ -482,19 +458,15 @@ def main():
             config.resolution, config.resolution
         )
 
-        # ----- SCENARIO 1: ORIGINAL RECONSTRUCTION -----
-        # Reconstruct field using original points and original true field magnitude
         print("\nSCENARIO 1: Original reconstruction")
         original_recon_field, _ = reconstruct_field_from_magnitude(
             H_original, np.abs(original_true_field), config
         )
 
-        # Store reshaped field data
         original_recon_field_2d = np.abs(original_recon_field).reshape(
             config.resolution, config.resolution
         )
 
-        # Evaluate original reconstruction against original true field
         original_vs_original_metrics = {
             "rmse": normalized_rmse(np.abs(original_true_field), np.abs(original_recon_field)),
             "correlation": normalized_correlation(
@@ -506,21 +478,11 @@ def main():
             f"Correlation: {original_vs_original_metrics['correlation']:.6f}"
         )
 
-        # ----- SCENARIO 2A: PERTURBED GEOMETRY WITH ORIGINAL CURRENTS -----
-        # This is what happens in the real world:
-        # 1. We have real field measurements (original_true_field)
-        # 2. We have an imperfect model of the geometry (perturbed_points)
-        # 3. We compute what field our imperfect model would produce WITH THE TRUE CURRENTS
-        # 4. We compare this to the actual field measurements
 
-        print("\nSCENARIO 2A: Realistic perturbation scenario - fixed currents")
 
-        # Compute what field the perturbed point cloud would produce with original currents
-        # This is our prediction from the perturbed model using the best estimate of currents
-        # This simulates using our digital twin with the best estimate of the current sources
+
         forward_field = H_perturbed @ original_currents
 
-        # Store reshaped field data
         perturbed_forward_field_2d = np.abs(forward_field).reshape(
             config.resolution, config.resolution
         )
@@ -538,19 +500,13 @@ def main():
             f"Correlation: {perturbed_forward_metrics['correlation']:.6f}"
         )
 
-        # ----- SCENARIO 2B: PERTURBED RECONSTRUCTION WITH OPTIMIZED CURRENTS -----
-        # This allows "overfitting":
-        # 1. We have real field measurements (original_true_field)
-        # 2. We have an imperfect model of the geometry (perturbed_points)
-        # 3. We optimize currents using phase retrieval to match the field magnitude
-        # This is like "adjusting" our source model to compensate for geometric errors
+
 
         print("\nSCENARIO 2B: Overfitting scenario - optimized currents")
         perturbed_overfitting_field, _ = reconstruct_field_from_magnitude(
             H_perturbed, np.abs(original_true_field), config
         )
 
-        # Store reshaped field data
         perturbed_overfitting_field_2d = np.abs(perturbed_overfitting_field).reshape(
             config.resolution, config.resolution
         )
@@ -570,8 +526,6 @@ def main():
             f"Correlation: {perturbed_overfitting_metrics['correlation']:.6f}"
         )
 
-        # ----- SCENARIO 3: PERTURBED SELF-RECONSTRUCTION -----
-        # Reconstruct field using perturbed points and perturbed true field magnitude
         print("\nSCENARIO 3: Perturbed reconstruction vs Perturbed true field")
         perturbed_self_recon_field, _ = reconstruct_field_from_magnitude(
             H_perturbed, np.abs(perturbed_true_field), config

@@ -89,13 +89,30 @@ def apply_magnitude_constraint(
     # Calculate magnitude
     simulated_magnitude = np.abs(simulated_field)
 
-    # More efficient handling of division by zero
-    magnitude_mask = simulated_magnitude < 1e-10
-    if np.any(magnitude_mask):
-        simulated_magnitude[magnitude_mask] = 1e-10
+    # Handle division by zero or near-zero magnitudes
+    # Create masks for zero and near-zero simulated magnitudes
+    zero_mask = np.abs(simulated_field) < 1e-15 # Mask for exact zeros
+    near_zero_mask = (np.abs(simulated_field) >= 1e-15) & (simulated_magnitude < 1e-10) # Mask for near-zeros
 
-    # Apply magnitude constraint while preserving phase
-    field_values = measured_magnitude * (simulated_field / simulated_magnitude)
+    # Initialize output field values
+    field_values = np.zeros_like(simulated_field, dtype=np.complex128)
+
+    # Case 1: Simulated field is exactly zero - assign measured magnitude with zero phase
+    if np.any(zero_mask):
+        field_values[zero_mask] = measured_magnitude[zero_mask] # Assign magnitude, phase is 0
+
+    # Case 2: Simulated field is near-zero (but not exactly zero) - use small value for stable division
+    if np.any(near_zero_mask):
+        # Calculate phase using the original simulated_field to avoid phase distortion
+        phase_factor = simulated_field[near_zero_mask] / np.abs(simulated_field[near_zero_mask])
+        field_values[near_zero_mask] = measured_magnitude[near_zero_mask] * phase_factor
+
+    # Case 3: Normal case - simulated magnitude is sufficiently large
+    normal_mask = ~(zero_mask | near_zero_mask)
+    if np.any(normal_mask):
+        # Apply magnitude constraint while preserving phase
+        phase_factor = simulated_field[normal_mask] / simulated_magnitude[normal_mask]
+        field_values[normal_mask] = measured_magnitude[normal_mask] * phase_factor
 
     return field_values
 

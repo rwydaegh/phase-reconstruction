@@ -380,7 +380,7 @@ def main():
 
     from src.utils.normalized_correlation import normalized_correlation
     from src.utils.normalized_rmse import normalized_rmse
-    from src.visualization import (
+    from src.visualization.history_plots import (
         visualize_current_and_field_history,
         visualize_iteration_history,
     )

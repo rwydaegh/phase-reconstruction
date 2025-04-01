@@ -1,15 +1,18 @@
-import argparse
+import hydra
+from omegaconf import DictConfig, OmegaConf
+
+# import argparse # Replaced by Hydra
 import logging
 import pickle
 import random
-from dataclasses import asdict, dataclass, fields
+# from dataclasses import asdict, dataclass, fields # No longer needed directly here
 
 import numpy as np
 
 from src.create_channel_matrix import create_channel_matrix
 from src.create_test_pointcloud import create_test_pointcloud
 from src.algorithms.gerchberg_saxton import holographic_phase_retrieval
-from src.simulation_config_fake_data import SimulationConfig
+# from src.simulation_config_fake_data import SimulationConfig # Replaced by Hydra config
 from src.utils.field_utils import compute_fields, reconstruct_field
 # from src.visualization import visualize_current_and_field_history # Moved
 from src.visualization.history_plots import visualize_current_and_field_history # Import moved function
@@ -21,15 +24,20 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def main(
-    config: SimulationConfig,
-) -> None:
+@hydra.main(config_path="conf", config_name="fake_data", version_base=None)
+def main(cfg: DictConfig) -> None:
     """Main demonstration of field reconstruction using holographic phase retrieval."""
 
     # Create or load point cloud
-    if config.use_source_pointcloud:
-        logger.info(f"Loading source point cloud from {config.source_pointcloud_path}...")
-        with open(config.source_pointcloud_path, "rb") as f:
+    # Log the configuration being used (Hydra handles saving it automatically)
+    logger.info(OmegaConf.to_yaml(cfg))
+
+    # Create or load point cloud
+    if cfg.use_source_pointcloud:
+        logger.info(f"Loading source point cloud from {cfg.source_pointcloud_path}...")
+        # Ensure the path is resolved correctly relative to the original CWD if needed
+        # For now, assume it's relative to the project root or absolute
+        with open(cfg.source_pointcloud_path, "rb") as f:
             data = pickle.load(f)
 
         # Source is a (5328,4) array with last column being distance
@@ -38,9 +46,9 @@ def main(
         logger.info(f"Loaded point cloud with {len(points)} points, shape: {points.shape}")
     else:
         logger.info("Creating test point cloud...")
-        points = create_test_pointcloud(config)
+        points = create_test_pointcloud(cfg) # Pass DictConfig, assuming compatibility
 
-    logger.info(f"Final points shape: {points.shape}")
+    logger.info(f"Using point cloud shape: {points.shape}")
 
     # Create simple current distribution (scalar amplitudes for each point)
     # For scalar field, we just need one value per point
@@ -48,11 +56,11 @@ def main(
 
     # Set random indices in the currents array to be active
     # with log-normal amplitude distribution and random phases
-    num_sources = min(config.num_sources, len(currents))
+    num_sources = min(cfg.num_sources, len(currents))
     source_indices = random.sample(range(len(currents)), num_sources)
 
     # Generate log-normal amplitudes
-    amplitudes = np.random.lognormal(mean=0, sigma=config.amplitude_sigma, size=num_sources)
+    amplitudes = np.random.lognormal(mean=0, sigma=cfg.amplitude_sigma, size=num_sources)
 
     # Generate random phases between 0 and 2π
     phases = np.random.uniform(0, 2 * np.pi, size=num_sources)
@@ -67,25 +75,28 @@ def main(
 
     # Create measurement plane centered at (0,0,0)
     logger.info("Creating measurement plane...")
-    x = np.linspace(-config.plane_size / 2, config.plane_size / 2, config.resolution)
-    y = np.linspace(-config.plane_size / 2, config.plane_size / 2, config.resolution)
+    x = np.linspace(-cfg.plane_size / 2, cfg.plane_size / 2, cfg.resolution)
+    y = np.linspace(-cfg.plane_size / 2, cfg.plane_size / 2, cfg.resolution)
     X, Y = np.meshgrid(x, y)
     measurement_plane = np.stack([X, Y, np.zeros_like(X)], axis=-1)
 
+    # Calculate k from wavelength
+    k = 2 * np.pi / cfg.wavelength
+
     # Create channel matrix for scalar fields
     logger.info("Creating channel matrix...")
-    H = create_channel_matrix(points, measurement_plane, config.k)
+    H = create_channel_matrix(points, measurement_plane, k)
 
     # Calculate ground truth field on measurement plane
     logger.info("Calculating ground truth field...")
-    true_field = compute_fields(points, currents, measurement_plane, config.k, H)
+    true_field = compute_fields(points, currents, measurement_plane, k, H)
 
     # Reshape to 2D grid
-    true_field_2d = true_field.reshape(config.resolution, config.resolution)
+    true_field_2d = true_field.reshape(cfg.resolution, cfg.resolution)
 
     # Get field magnitude (what we would measure)
-    measured_magnitude = np.abs(true_field)
-    measured_magnitude_2d = measured_magnitude.reshape(config.resolution, config.resolution)
+    measured_magnitude = np.abs(true_field) # Use magnitude from synthetic true field
+    measured_magnitude_2d = measured_magnitude.reshape(cfg.resolution, cfg.resolution)
 
     # Phase retrieval demonstration
     logger.info("Running holographic phase retrieval with perturbation strategies...")
@@ -93,25 +104,25 @@ def main(
     hpr_result = holographic_phase_retrieval(
         H,
         measured_magnitude,
-        adaptive_regularization=config.adaptive_regularization,
-        num_iterations=config.gs_iterations,
-        convergence_threshold=config.convergence_threshold,
-        regularization=config.regularization,
-        return_history=config.return_history,
-        # Use parameters from config
-        enable_perturbations=config.enable_perturbations,
-        stagnation_window=config.stagnation_window,
-        stagnation_threshold=config.stagnation_threshold,
-        perturbation_intensity=config.perturbation_intensity,
-        perturbation_mode=config.perturbation_mode,
-        constraint_skip_iterations=config.constraint_skip_iterations,
-        momentum_factor=config.momentum_factor,
-        temperature=config.temperature,
-        verbose=config.verbose,
-        no_plot=config.no_plot,
+        adaptive_regularization=cfg.adaptive_regularization,
+        num_iterations=cfg.gs_iterations,
+        convergence_threshold=cfg.convergence_threshold,
+        regularization=cfg.regularization,
+        return_history=cfg.return_history,
+        # Use parameters from cfg
+        enable_perturbations=cfg.enable_perturbations,
+        stagnation_window=cfg.stagnation_window,
+        stagnation_threshold=cfg.stagnation_threshold,
+        perturbation_intensity=cfg.perturbation_intensity,
+        perturbation_mode=cfg.perturbation_mode,
+        constraint_skip_iterations=cfg.constraint_skip_iterations,
+        momentum_factor=cfg.momentum_factor,
+        temperature=cfg.temperature,
+        verbose=cfg.verbose,
+        no_plot=cfg.no_plot,
     )
 
-    if config.return_history:
+    if cfg.return_history:
         # Handle the return signature with history and stats
         cluster_coefficients, coefficient_history, field_history, stats = hpr_result
         logger.info(f"Coefficient history shape: {coefficient_history.shape}")
@@ -144,7 +155,7 @@ def main(
                 f"  Average improvement from successful perturbations: {avg_improvement:.6f}"
             )
 
-        if not config.no_anim:
+        if not cfg.no_anim:
             # Create enhanced 3-panel animation with field magnitude and both types of error
             logger.info("Creating GS iteration animation...")
             visualize_iteration_history(
@@ -152,14 +163,14 @@ def main(
                 H,
                 coefficient_history,
                 field_history,
-                config.resolution,
+                cfg.resolution,
                 measurement_plane,
-                show_plot=(config.show_plot and not config.no_plot),
+                show_plot=(cfg.show_plot and not cfg.no_plot),
                 output_file="gs_animation.gif",
                 frame_skip=10,  # Increased frame skip for faster animation
-                perturbation_iterations=stats.get("perturbation_iterations", []),
+                perturbation_iterations=stats.get("perturbation_iterations", []), # Get stats from HPR result
                 restart_iterations=[],  # No restarts in vanilla implementation
-                convergence_threshold=config.convergence_threshold,
+                convergence_threshold=cfg.convergence_threshold,
                 measured_magnitude=measured_magnitude,
                 # Pass the measured magnitude for true error calculation
             )
@@ -171,14 +182,14 @@ def main(
                 points,
                 coefficient_history,
                 field_history,
-                true_field,  # Pass the true field for comparison
-                config.resolution,
+                true_field,  # Pass the synthetic true field for comparison
+                cfg.resolution,
                 measurement_plane,
-                show_plot=(config.show_plot and not config.no_plot),
+                show_plot=(cfg.show_plot and not cfg.no_plot),
                 output_file="current_field_animation.gif",
             )
         else:
-            logger.info("Animation generation disabled with no_anim flag")
+            logger.info("Animation generation disabled via no_anim flag")
     else:
         # Handle the return signature with just stats
         cluster_coefficients, stats = hpr_result
@@ -192,7 +203,7 @@ def main(
 
     # Reconstruct field using estimated coefficients
     reconstructed_field = reconstruct_field(H, cluster_coefficients)
-    reconstructed_field_2d = reconstructed_field.reshape(config.resolution, config.resolution)
+    reconstructed_field_2d = reconstructed_field.reshape(cfg.resolution, cfg.resolution)
 
     # Calculate metrics
     def normalized_rmse(a, b):
@@ -213,7 +224,7 @@ def main(
     logger.info(f"  Correlation: {corr:.4f}")
 
     # Generate final field comparison visualization if not disabled
-    if not config.no_plot:
+    if not cfg.no_plot:
         logger.info("Generating final field comparison visualization...")
         visualize_fields(
             points,
@@ -222,78 +233,14 @@ def main(
             true_field_2d,
             measured_magnitude_2d,
             reconstructed_field_2d,
-            rmse,
-            corr,
-            show_plot=config.show_plot,
+            rmse, # Calculated RMSE
+            corr, # Calculated Correlation
+            show_plot=cfg.show_plot,
             output_file="results.png",
         )
     else:
-        logger.info("Plot generation disabled with no_plot flag")
-
-
-def validate_config(config: SimulationConfig) -> None:
-    """Validate simulation configuration."""
-    if config.resolution < 10 or config.resolution > 200:
-        raise ValueError("Resolution must be between 10 and 200")
-    if config.wavelength <= 0:
-        raise ValueError("Wavelength must be positive")
-    if config.room_size <= 0:
-        raise ValueError("Room size must be positive")
-    if config.wall_points <= 0:
-        raise ValueError("Wall points must be positive")
-    if config.num_sources <= 0:
-        raise ValueError("Number of sources must be positive")
-    if config.gs_iterations <= 0:
-        raise ValueError("GS iterations must be positive")
-    if config.convergence_threshold <= 0:
-        raise ValueError("Convergence threshold must be positive")
+        logger.info("Plot generation disabled via no_plot flag")
 
 
 if __name__ == "__main__":
-    try:
-        # Create argument parser
-        parser = argparse.ArgumentParser(
-            description="Run field reconstruction simulation with refactored phase retrieval"
-        )
-
-        # Add arguments for each configuration parameter
-        for field in fields(SimulationConfig):
-            # Convert default value to string for help message
-            default_value = getattr(SimulationConfig, field.name)
-            help_text = f"{field.name} (default: {default_value})"
-
-            # Handle boolean fields differently
-            if field.type is bool:
-                parser.add_argument(
-                    f"--{field.name}",
-                    type=lambda x: x.lower() in ("true", "t", "yes", "y", "1"),
-                    help=help_text,
-                )
-            else:
-                # Add the argument with appropriate type
-                parser.add_argument(f"--{field.name}", type=field.type, help=help_text)
-
-        # Parse arguments
-        args = parser.parse_args()
-
-        # Create configuration with default values
-        config = SimulationConfig()
-
-        # Override with any command-line args provided
-        for field in fields(SimulationConfig):
-            arg_value = getattr(args, field.name)
-            if arg_value is not None:
-                setattr(config, field.name, arg_value)
-
-        validate_config(config)
-
-        logger.info("Starting field reconstruction simulation with phase retrieval")
-        logger.info(f"Configuration: {config}")
-
-        main(
-            config=config,
-        )
-
-    except Exception as e:
-        logger.error(f"Simulation failed: {str(e)}")
-        raise
+    main() # Hydra automatically passes the config object (cfg)

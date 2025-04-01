@@ -91,7 +91,6 @@ source_pointcloud.pkl
 
 # Specific large directories with their contents
 cube_environment_results/
-measurement_data/
 perturbation_animations/
 perturbation_results/
 real_data_results/

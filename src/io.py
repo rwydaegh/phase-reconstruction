@@ -20,7 +20,6 @@ def load_measurement_data(file_path):
 
     logger.info(f"Loaded measurement data with keys: {list(data.keys())}")
 
-    # Extract relevant data
     results = data["results"]
     continuous_axis = data["continuous_axis"]
     discrete_axis = data["discrete_axis"]
@@ -28,7 +27,6 @@ def load_measurement_data(file_path):
     points_discrete = data["points_discrete"]
     frequency = data.get("frequency", 28e9)
 
-    # Handle variable length lists by padding with np.nan
     if isinstance(results, list):
         max_signal_length = max(len(signal) for signal in results)
         processed_results = []
@@ -40,7 +38,6 @@ def load_measurement_data(file_path):
                 processed_results.append(signal)
         results = np.array(processed_results).astype(float)
 
-    # Convert points_discrete to numpy array if it's a list
     if isinstance(points_discrete, list):
         points_discrete = np.array(points_discrete)
 
@@ -57,7 +54,6 @@ def load_measurement_data(file_path):
         f"Frequency: {frequency/1e9:.2f} GHz (wavelength: {299792458/(frequency/1e9)/1e6:.2f} mm)"
     )
 
-    # Return relevant data
     return {
         "results": results,
         "continuous_axis": continuous_axis,
@@ -66,5 +62,3 @@ def load_measurement_data(file_path):
         "points_discrete": points_discrete,
         "frequency": frequency,
     }
-
-# Placeholder for future functions
