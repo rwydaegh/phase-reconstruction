@@ -65,6 +65,7 @@ line-ending = "auto"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.5"
+flake8 = "^7.1.0"
 
 [project]
 name = "phase-reconstruction"
