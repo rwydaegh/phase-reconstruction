@@ -79,13 +79,6 @@ skip-magic-trailing-comma = false
 # Like Black, automatically detect the appropriate line ending.
 line-ending = "auto"
 
-[tool.poetry]
-# Define the package structure.
-# Include the 'src' directory itself as the root of the package content.
-packages = [
-    { include = "src" },
-]
-
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.5"
