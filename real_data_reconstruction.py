@@ -1,3 +1,6 @@
+import hydra
+from omegaconf import DictConfig, OmegaConf
+
 import logging
 import os
 import pickle
@@ -186,33 +189,34 @@ def apply_gaussian_smoothing(data, R_pixels):
     return smoothed_data
 
 
-def main():
-    # Load configuration
-    config = SimulationConfig()
+def main(cfg: DictConfig) -> None:
+    # Configuration loaded by Hydra decorator
+    # config = SimulationConfig() # Removed
+    logger.info(OmegaConf.to_yaml(cfg)) # Log loaded config
 
     # Create output directory
     output_dir = "cube_environment_results"
     os.makedirs(output_dir, exist_ok=True)
 
     # Determine whether to use test point cloud or real data
-    if config.use_source_pointcloud:
+    if cfg.use_source_pointcloud:
         # Load source point cloud (real environment)
-        logger.info(f"Loading source point cloud from {config.source_pointcloud_path}...")
-        with open(config.source_pointcloud_path, "rb") as f:
+        logger.info(f"Loading source point cloud from {cfg.source_pointcloud_path}...")
+        with open(cfg.source_pointcloud_path, "rb") as f:
             data = pickle.load(f)
 
         # Source point cloud processing
         if isinstance(data, np.ndarray):
             if data.shape[1] >= 3:
                 # Downsample the point cloud
-                full_points = downsample_pointcloud(data, config.pointcloud_downsample)
+                full_points = downsample_pointcloud(data, cfg.pointcloud_downsample)
 
                 # Assume it's a point cloud array with x,y,z coordinates in the first 3 columns
                 points = full_points[:, :3]
 
                 logger.info(
                     f"Downsampled point cloud from {len(data)} to {len(points)} points "
-                    f"(factor: {config.pointcloud_downsample})"
+                    f"(factor: {cfg.pointcloud_downsample})"
                 )
 
                 # Apply translation by negative of specified coordinates
@@ -223,7 +227,7 @@ def main():
                 # Filter points based on distance from origin if specified
                 if hasattr(
                     config, "max_distance_from_origin"
-                ) and config.max_distance_from_origin < float("inf"):
+                ) and cfg.max_distance_from_origin < float("inf"):
                     # Calculate distance from origin for each point
                     if full_points.shape[1] > 3:  # If there's a distance column
                         distances = full_points[:, 3]
@@ -233,16 +237,16 @@ def main():
 
                     # Filter points
                     orig_num_points = len(points)
-                    points = points[distances <= config.max_distance_from_origin]
+                    points = points[distances <= cfg.max_distance_from_origin]
 
                     # Log how many points were removed
                     logger.info(
                         f"Filtered out {orig_num_points - len(points)} points "
-                        f"more than {config.max_distance_from_origin}m from origin"
+                        f"more than {cfg.max_distance_from_origin}m from origin"
                     )
                     logger.info(
                         f"Retained {len(points)} points "
-                        f"within {config.max_distance_from_origin}m from origin"
+                        f"within {cfg.max_distance_from_origin}m from origin"
                     )
             else:
                 raise ValueError(f"Source point cloud data has unexpected shape: {data.shape}")
@@ -254,7 +258,7 @@ def main():
         # Create test point cloud (centered cube)
         points = create_test_pointcloud(config)
         logger.info(
-            f"Created cube environment with {len(points)} points, cube size: {config.room_size}m"
+            f"Created cube environment with {len(points)} points, cube size: {cfg.room_size}m"
         )
 
     # Load and preprocess real measurement data
@@ -263,7 +267,7 @@ def main():
     measurement_data = load_measurement_data(measurement_file)
 
     # Sample measurement data to reduce dimensionality
-    sampled_data = sample_measurement_data(measurement_data, target_resolution=config.resolution)
+    sampled_data = sample_measurement_data(measurement_data, target_resolution=cfg.resolution)
 
     # Create measurement plane (already converted to meters)
     measurement_plane = create_measurement_plane(sampled_data)
@@ -276,9 +280,9 @@ def main():
 
     # Create wavelength in meters from frequency (for calculating wave number k)
     if (
-        config.use_source_pointcloud
+        cfg.use_source_pointcloud
         and hasattr(config, "use_measurement_frequency")
-        and config.use_measurement_frequency
+        and cfg.use_measurement_frequency
     ):
         # Calculate k from the measurement frequency when using real data
         wavelength = 299792458 / (measurement_data["frequency"] / 1e9) / 1000  # meters
@@ -287,8 +291,8 @@ def main():
         logger.info(f"Calculated wave number k: {k}, wavelength: {wavelength:.4f} m")
     else:
         # Use k from config
-        k = config.k
-        wavelength = config.wavelength
+        k = cfg.k
+        wavelength = cfg.wavelength
         logger.info(f"Using config wave number k: {k}, wavelength: {wavelength:.4f} m")
 
     # Create channel matrix for scalar fields
@@ -297,21 +301,21 @@ def main():
 
     # If using uniform current initialization, prepare initial field values
     initial_field_values = None
-    if hasattr(config, "uniform_current_init") and config.uniform_current_init:
+    if hasattr(config, "uniform_current_init") and cfg.uniform_current_init:
         logger.info(
-            f"Initializing currents with uniform amplitude {config.initial_current_amplitude} "
+            f"Initializing currents with uniform amplitude {cfg.initial_current_amplitude} "
             f"and random phase"
         )
         # Create uniform amplitude random phase current densities
         n_points = points.shape[0]
         random_phases = np.random.uniform(0, 2 * np.pi, n_points)
-        initial_currents = config.initial_current_amplitude * np.exp(1j * random_phases)
+        initial_currents = cfg.initial_current_amplitude * np.exp(1j * random_phases)
 
         # Compute pseudoinverse for initialization (using same regularization settings)
         from src.utils.phase_retrieval_utils import compute_pseudoinverse
 
         # H_pinv_init = compute_pseudoinverse( # Unused
-        #     H, config.regularization, config.adaptive_regularization
+        #     H, cfg.regularization, cfg.adaptive_regularization
         # )
 
         # Compute initial field values from these currents
@@ -332,25 +336,25 @@ def main():
     hpr_result = holographic_phase_retrieval(
         H,
         measured_magnitude,
-        adaptive_regularization=config.adaptive_regularization,
-        num_iterations=config.gs_iterations,
-        convergence_threshold=config.convergence_threshold,
-        regularization=config.regularization,
-        return_history=config.return_history,
-        enable_perturbations=config.enable_perturbations,
-        stagnation_window=config.stagnation_window,
-        stagnation_threshold=config.stagnation_threshold,
-        perturbation_intensity=config.perturbation_intensity,
-        perturbation_mode=config.perturbation_mode,
-        constraint_skip_iterations=config.constraint_skip_iterations,
-        momentum_factor=config.momentum_factor,
-        temperature=config.temperature,
-        verbose=config.verbose,
-        no_plot=config.no_plot,
+        adaptive_regularization=cfg.adaptive_regularization,
+        num_iterations=cfg.gs_iterations,
+        convergence_threshold=cfg.convergence_threshold,
+        regularization=cfg.regularization,
+        return_history=cfg.return_history,
+        enable_perturbations=cfg.enable_perturbations,
+        stagnation_window=cfg.stagnation_window,
+        stagnation_threshold=cfg.stagnation_threshold,
+        perturbation_intensity=cfg.perturbation_intensity,
+        perturbation_mode=cfg.perturbation_mode,
+        constraint_skip_iterations=cfg.constraint_skip_iterations,
+        momentum_factor=cfg.momentum_factor,
+        temperature=cfg.temperature,
+        verbose=cfg.verbose,
+        no_plot=cfg.no_plot,
         initial_field_values=initial_field_values,  # Pass initial field values if provided
     )
 
-    if config.return_history:
+    if cfg.return_history:
         cluster_coefficients, coefficient_history, field_history, stats = hpr_result
     else:
         cluster_coefficients, stats = hpr_result
@@ -399,18 +403,18 @@ def main():
     true_field_2d = measured_magnitude_2d.copy()
 
     # Apply Gaussian smoothing as post-processing if enabled in config
-    if config.enable_smoothing:
-        logger.info(f"Applying Gaussian smoothing with radius {config.smoothing_radius_mm} mm")
+    if cfg.enable_smoothing:
+        logger.info(f"Applying Gaussian smoothing with radius {cfg.smoothing_radius_mm} mm")
 
         # Convert physical radius to pixel radius
         R_pixels = physical_to_pixel_radius(
-            config.smoothing_radius_mm,
+            cfg.smoothing_radius_mm,
             sampled_data["points_continuous"],
             sampled_data["points_discrete"],
         )
 
         logger.info(
-            f"Converted physical radius {config.smoothing_radius_mm} mm "
+            f"Converted physical radius {cfg.smoothing_radius_mm} mm "
             f"to pixel radius {R_pixels:.2f}"
         )
 
@@ -461,9 +465,9 @@ def main():
     }
 
     # Add smoothing information if smoothing was applied
-    if config.enable_smoothing:
+    if cfg.enable_smoothing:
         results_dict["smoothing_applied"] = True
-        results_dict["smoothing_radius_mm"] = config.smoothing_radius_mm
+        results_dict["smoothing_radius_mm"] = cfg.smoothing_radius_mm
         results_dict["smoothed_true_field"] = true_field
         results_dict["smoothed_true_field_2d"] = true_field_2d
         results_dict["smoothed_reconstructed_field"] = reconstructed_field
@@ -475,7 +479,7 @@ def main():
     logger.info(f"Results saved to {output_dir}/reconstruction_results.pkl")
 
     # Generate field comparison visualization
-    if not config.no_plot:
+    if not cfg.no_plot:
         logger.info("Generating field comparison visualization...")
         # With improved visualization functions, we can use the measurement plane directly
         # without any adaptation - the functions now detect plane type automatically
@@ -489,13 +493,13 @@ def main():
             reconstructed_field_2d,
             rmse,
             corr,
-            show_plot=config.show_plot,
+            show_plot=cfg.show_plot,
             output_file=f"{output_dir}/cube_reconstruction.png",
         )
 
         # Create animation if history was returned
-        if not config.no_anim:
-            assert config.return_history is True, "History must be returned to create animations"
+        if not cfg.no_anim:
+            assert cfg.return_history is True, "History must be returned to create animations"
             logger.info("Creating GS iteration animation...")
             # Now our data is square (50x50), we can use the standard visualization functions
             logger.info(f"Field dimensions: {resolution_y}×{resolution_z}")
@@ -514,11 +518,11 @@ def main():
                 field_history,
                 resolution_param,
                 measurement_plane,  # Use measurement plane directly
-                show_plot=config.show_plot,
+                show_plot=cfg.show_plot,
                 output_file=f"{output_dir}/gs_animation.gif",
                 frame_skip=1,  # Lower frame skip for smoother animation
                 perturbation_iterations=stats.get("perturbation_iterations", []),
-                convergence_threshold=config.convergence_threshold,
+                convergence_threshold=cfg.convergence_threshold,
                 measured_magnitude=measured_magnitude,
             )
 
@@ -530,7 +534,7 @@ def main():
                 true_field,
                 resolution_param,
                 measurement_plane,  # Use measurement plane directly
-                show_plot=config.show_plot,
+                show_plot=cfg.show_plot,
                 output_file=f"{output_dir}/current_field_animation.gif",
                 frame_skip=1,  # Lower frame skip for smoother animation
             )
