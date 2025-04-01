@@ -10,13 +10,13 @@ from hydra import compose, initialize
 from hydra.core.global_hydra import GlobalHydra
 from omegaconf import DictConfig
 
-# Local application imports
-import simulated_data_reconstruction
-
-# Ensure the main project directory is in the Python path *after* imports
+# Ensure the main project directory is in the Python path *before* local imports
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
+
+# Local application imports
+import simulated_data_reconstruction
 
 # Configure logging (after imports and path modification)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
