@@ -10,26 +10,29 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 # Third-party imports
-import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.colors import LogNorm
+from omegaconf import DictConfig, OmegaConf # Import DictConfig and OmegaConf
+
 
 # Add parent directory to path to find modules
-# This is generally discouraged, consider making the project installable
-# or using relative imports if structure allows.
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Local application imports
-from src.config_types import BaseConfig
-from src.simulation_config_real_data import SimulationConfig
+from omegaconf import DictConfig # Import DictConfig for type hinting
+
+# Import necessary functions from src
+from src.algorithms.gerchberg_saxton import holographic_phase_retrieval
+from src.create_test_pointcloud import create_test_pointcloud
+from src.utils.field_utils import create_channel_matrix, reconstruct_field
+from src.utils.normalized_correlation import normalized_correlation
+from src.utils.normalized_rmse import normalized_rmse
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Define parameter variation ranges (Comment moved/redundant)
 @dataclass
-class ParameterRange(BaseConfig):
+class ParameterRange:
     """Range of values for a parameter in the sensitivity analysis"""
 
     param_name: str
@@ -39,8 +42,7 @@ class ParameterRange(BaseConfig):
     log_scale: bool = False
 
     def __post_init__(self):
-        super().__post_init__()  # Call parent's type casting
-        # Additional post-init processing for integer parameters
+        # Post-init processing for integer parameters
         if self.param_name in ["wall_points", "resolution", "num_sources", "gs_iterations"]:
             self.start = int(float(self.start))
             self.end = int(float(self.end))
@@ -57,7 +59,7 @@ class ParameterRange(BaseConfig):
 class SensitivityAnalysisConfig:
     """Configuration for sensitivity analysis"""
 
-    base_config: SimulationConfig = field(default_factory=SimulationConfig)
+    base_config: DictConfig
     parameter_ranges: List[ParameterRange] = field(default_factory=list)
     output_dir: str = "sensitivity_results"
     parallel: bool = True
@@ -80,14 +82,22 @@ class SensitivityAnalysisConfig:
         configs = []
         for i, val1 in enumerate(values1):
             for j, val2 in enumerate(values2):
-                # Create a copy of the base config
-                config_dict = asdict(self.base_config)
+                # Create a copy and convert base config to dictionary
+                config_dict = OmegaConf.to_container(self.base_config, resolve=True)
 
-                # Update with the specific parameter values
-                config_dict[param1.param_name] = val1
-                config_dict[param2.param_name] = val2
+                # Update with the specific parameter values, ensuring type consistency if needed
+                # Update with specific parameter values, ensuring type consistency
+                param1_val = val1
+                param2_val = val2
+                if param1.param_name in ["wall_points", "resolution", "num_sources", "gs_iterations"]:
+                    param1_val = int(val1)
+                if param2.param_name in ["wall_points", "resolution", "num_sources", "gs_iterations"]:
+                    param2_val = int(val2)
 
-                # Add indices for reshaping results later
+                config_dict[param1.param_name] = param1_val
+                config_dict[param2.param_name] = param2_val
+
+                # Add grid indices
                 config_dict["grid_i"] = int(i)
                 config_dict["grid_j"] = int(j)
 
@@ -105,17 +115,16 @@ def run_simulation(config_dict: Dict[Any, Any]) -> Dict[str, Any]:
     # Disable plot display for batch runs
     config_dict["show_plot"] = False
 
-    # Create config dataclass
-    config = SimulationConfig(**config_dict)
+    # Pass the config dictionary directly, assuming the called function handles it.
+    # If holographic_phase_retrieval strictly needs DictConfig, convert here.
+    config = config_dict # Pass the dictionary directly for now
 
     try:
-        # Capture start time
         start_time = time.time()
 
-        # Run simulation - modified to return metrics
+        # Run simulation
         rmse, corr = run_simulation_and_get_metrics(config)
 
-        # Measure elapsed time
         elapsed_time = time.time() - start_time
 
         return {
@@ -132,28 +141,28 @@ def run_simulation(config_dict: Dict[Any, Any]) -> Dict[str, Any]:
         raise e
 
 
-def run_simulation_and_get_metrics(config: SimulationConfig) -> Tuple[float, float]:
+def run_simulation_and_get_metrics(config: Dict) -> Tuple[float, float]:
     """Run simulation and return metrics without visualization"""
-    # Import from parent directory
     import random
+    from omegaconf import OmegaConf # Needed to access DictConfig attributes easily
 
-    from src.create_test_pointcloud import create_test_pointcloud
-    from src.algorithms.gerchberg_saxton import holographic_phase_retrieval
-    from src.utils.field_utils import compute_fields, create_channel_matrix, reconstruct_field
+    # Convert dict to DictConfig for easier attribute access
+    cfg = OmegaConf.create(config)
 
     # Create test environment
-    points = create_test_pointcloud(config)
+    points = create_test_pointcloud(cfg) # Pass DictConfig
 
     # Create currents (similar to main.py)
     currents = np.zeros(len(points), dtype=complex)
-    num_sources = min(config.num_sources, len(currents))
+    num_sources = min(cfg.num_sources, len(currents))
     source_indices = random.sample(range(len(currents)), int(num_sources))
 
     # Use the same random seed for all simulations to ensure fair comparison
     np.random.seed(42)
 
     # Generate log-normal amplitudes
-    amplitudes = np.random.lognormal(mean=0, sigma=3, size=int(num_sources))
+    amplitude_sigma = cfg.get("amplitude_sigma", 3.0)
+    amplitudes = np.random.lognormal(mean=0, sigma=amplitude_sigma, size=int(num_sources))
 
     # Generate random phases between 0 and 2π
     phases = np.random.uniform(0, 2 * np.pi, size=int(num_sources))
@@ -165,23 +174,26 @@ def run_simulation_and_get_metrics(config: SimulationConfig) -> Tuple[float, flo
         # Fallback: use first point
         currents[0] = 1.0
 
-    # Create measurement plane
-    resolution = int(config.resolution)
+    # Create measurement plane (Ensure keys exist in cfg)
+    resolution = int(cfg.resolution)
+    room_size = cfg.room_size
+    plane_size = cfg.plane_size
     x = np.linspace(
-        config.room_size / 2 - config.plane_size / 2,
-        config.room_size / 2 + config.plane_size / 2,
+        room_size / 2 - plane_size / 2,
+        room_size / 2 + plane_size / 2,
         resolution,
     )
     y = np.linspace(
-        config.room_size / 2 - config.plane_size / 2,
-        config.room_size / 2 + config.plane_size / 2,
+        room_size / 2 - plane_size / 2,
+        room_size / 2 + plane_size / 2,
         resolution,
     )
     X, Y = np.meshgrid(x, y)
-    measurement_plane = np.stack([X, Y, np.ones_like(X) * config.room_size / 2], axis=-1)
+    measurement_plane = np.stack([X, Y, np.ones_like(X) * room_size / 2], axis=-1)
 
-    # Create channel matrix for scalar fields
-    H = create_channel_matrix(points, measurement_plane, config.k)
+    # Create channel matrix
+    k = cfg.get("k", 2 * np.pi / cfg.wavelength)
+    H = create_channel_matrix(points, measurement_plane, k)
 
     # Calculate ground truth field on measurement plane
     true_field = H @ currents
@@ -190,28 +202,22 @@ def run_simulation_and_get_metrics(config: SimulationConfig) -> Tuple[float, flo
     measured_magnitude = np.abs(true_field)
 
     # Phase retrieval
-    cluster_coefficients = holographic_phase_retrieval(
+    hpr_result = holographic_phase_retrieval(
+        cfg,
         H,
         measured_magnitude,
-        adaptive_regularization=config.adaptive_regularization,
-        num_iterations=config.gs_iterations,
-        convergence_threshold=config.convergence_threshold,
-        regularization=1e-3,
-        return_history=False,
-        debug=False,
     )
+
+    # Handle return value (might be tuple)
+    if isinstance(hpr_result, tuple):
+        cluster_coefficients = hpr_result[0]
+    else:
+        cluster_coefficients = hpr_result
 
     # Reconstruct field using estimated coefficients
     reconstructed_field = reconstruct_field(H, cluster_coefficients)
 
     # Calculate metrics
-    def normalized_rmse(a, b):
-        return np.sqrt(np.mean((a - b) ** 2)) / (np.max(a) - np.min(a))
-
-    def normalized_correlation(a, b):
-        a_norm = (a - np.mean(a)) / np.std(a)
-        b_norm = (b - np.mean(b)) / np.std(b)
-        return np.correlate(a_norm.flatten(), b_norm.flatten())[0] / len(a_norm.flatten())
 
     # Calculate reconstruction quality metrics
     rmse = normalized_rmse(np.abs(true_field), np.abs(reconstructed_field))
@@ -256,21 +262,15 @@ def run_sensitivity_analysis(analysis_config: SensitivityAnalysisConfig):
                 for i, future in enumerate(as_completed(future_to_config)):
                     result = future.result()
                     results.append(result)
-                    logger.info(
-                        f"Completed simulation {i+1}/{len(config_dicts)}: "
-                        f"RMSE={result.get('rmse', np.nan):.4f}, "
-                        f"Time={result.get('elapsed_time', 0):.2f}s"
-                    )
+                    # Optional: Log progress less verbosely or based on a flag
+                    # logger.debug(f"Completed simulation {i+1}/{len(config_dicts)}")
         else:
             # Sequential execution
             for i, config_dict in enumerate(config_dicts):
                 result = run_simulation(config_dict)
                 results.append(result)
-                logger.info(
-                    f"Completed simulation {i+1}/{len(config_dicts)}: "
-                    f"RMSE={result.get('rmse', np.nan):.4f}, "
-                    f"Time={result.get('elapsed_time', 0):.2f}s"
-                )
+                # Optional: Log progress less verbosely or based on a flag
+                # logger.debug(f"Completed simulation {i+1}/{len(config_dicts)}")
 
         # Process results
         rmse_grid = np.full_like(X, np.nan)
@@ -280,84 +280,19 @@ def run_sensitivity_analysis(analysis_config: SensitivityAnalysisConfig):
         for result in results:
             if result["success"]:
                 i, j = result["grid_i"], result["grid_j"]
-                rmse_grid[j, i] = result["rmse"]  # Note: j, i order for correct orientation
+                rmse_grid[j, i] = result["rmse"]
                 corr_grid[j, i] = result["corr"]
                 time_grid[j, i] = result["elapsed_time"]
 
-        # Plot RMSE heatmap
-        plt.figure(figsize=(10, 8))
-
-        # Use log scale for the colormap if values span multiple orders of magnitude
-        vmin, vmax = np.nanmin(rmse_grid), np.nanmax(rmse_grid)
-        if vmax / max(vmin, 1e-10) > 100:  # If range spans more than 2 orders of magnitude
-            norm = LogNorm(vmin=max(vmin, 1e-10), vmax=vmax)
-            plt.pcolormesh(X, Y, rmse_grid, norm=norm, cmap="viridis")
-        else:
-            plt.pcolormesh(X, Y, rmse_grid, cmap="viridis")
-
-        plt.colorbar(label="Normalized RMSE")
-        plt.xlabel(param1.param_name)
-        plt.ylabel(param2.param_name)
-        plt.title("Sensitivity Analysis: Impact on Reconstruction Error")
-
-        # Use log scale for axes if specified
-        if param1.log_scale:
-            plt.xscale("log")
-        if param2.log_scale:
-            plt.yscale("log")
-
-        # Save figure
-        plt.tight_layout()
-        base_filename = f"sensitivity_{param1.param_name}_vs_{param2.param_name}_rmse.png"
-        filename = os.path.join(analysis_config.output_dir, base_filename)
-        plt.savefig(filename)
-        plt.close()
-
-        # Plot correlation heatmap
-        plt.figure(figsize=(10, 8))
-        plt.pcolormesh(X, Y, corr_grid, cmap="plasma")
-        plt.colorbar(label="Correlation")
-        plt.xlabel(param1.param_name)
-        plt.ylabel(param2.param_name)
-        plt.title("Sensitivity Analysis: Impact on Reconstruction Correlation")
-
-        # Use log scale for axes if specified
-        if param1.log_scale:
-            plt.xscale("log")
-        if param2.log_scale:
-            plt.yscale("log")
-
-        # Save figure
-        plt.tight_layout()
-        base_filename = f"sensitivity_{param1.param_name}_vs_{param2.param_name}_corr.png"
-        filename = os.path.join(analysis_config.output_dir, base_filename)
-        plt.savefig(filename)
-        plt.close()
-
-        # Plot computation time heatmap
-        plt.figure(figsize=(10, 8))
-        plt.pcolormesh(X, Y, time_grid, cmap="inferno")
-        plt.colorbar(label="Computation Time (s)")
-        plt.xlabel(param1.param_name)
-        plt.ylabel(param2.param_name)
-        plt.title("Sensitivity Analysis: Computation Time")
-
-        # Use log scale for axes if specified
-        if param1.log_scale:
-            plt.xscale("log")
-        if param2.log_scale:
-            plt.yscale("log")
-
-        # Save figure
-        plt.tight_layout()
-        base_filename = f"sensitivity_{param1.param_name}_vs_{param2.param_name}_time.png"
-        filename = os.path.join(analysis_config.output_dir, base_filename)
-        plt.savefig(filename)
-        plt.close()
+        # Plotting is handled by the calling script (run_sensitivity_analysis.py)
 
         # Save raw data as numpy arrays for future analysis
+        data_filename = os.path.join(
+             analysis_config.output_dir,
+             f"sensitivity_{param1.param_name}_vs_{param2.param_name}_data.npz"
+        )
         np.savez(
-            f"{analysis_config.output_dir}/sensitivity_{param1.param_name}_vs_{param2.param_name}_data.npz",
+            data_filename,
             X=X,
             Y=Y,
             rmse=rmse_grid,
@@ -366,47 +301,6 @@ def run_sensitivity_analysis(analysis_config: SensitivityAnalysisConfig):
             param1_name=param1.param_name,
             param2_name=param2.param_name,
         )
+        logger.info(f"Saved raw data to {data_filename}")
 
 
-if __name__ == "__main__":
-    # Create default base configuration
-    base_config = SimulationConfig(
-        wavelength=10.7e-3,  # 28GHz wavelength in meters
-        plane_size=1.0,  # 1m x 1m measurement plane
-        resolution=30,  # Reduced for faster execution
-        room_size=2.0,  # 2m x 2m x 2m room
-        wall_points=6,  # Points per wall edge
-        num_sources=50,  # Number of sources to randomly select
-        gs_iterations=100,  # Reduced for faster execution
-        convergence_threshold=1e-3,
-        show_plot=False,  # Disable plotting for batch runs
-        return_history=False,  # Disable history for faster execution
-    )
-
-    # Define parameter ranges to analyze
-    parameter_ranges = [
-        # Wall discretization
-        ParameterRange(param_name="wall_points", start=4, end=12, num_steps=5, log_scale=False),
-        # Number of sources
-        ParameterRange(param_name="num_sources", start=10, end=200, num_steps=5, log_scale=True),
-        # Measurement plane resolution
-        ParameterRange(param_name="resolution", start=10, end=60, num_steps=4, log_scale=False),
-        # GS iterations
-        ParameterRange(param_name="gs_iterations", start=50, end=300, num_steps=4, log_scale=False),
-        # Convergence threshold
-        ParameterRange(
-            param_name="convergence_threshold", start=1e-4, end=1e-2, num_steps=4, log_scale=True
-        ),
-    ]
-
-    # Create sensitivity analysis configuration
-    analysis_config = SensitivityAnalysisConfig(
-        base_config=base_config,
-        parameter_ranges=parameter_ranges,
-        output_dir="sensitivity_results",
-        parallel=True,
-        max_workers=4,  # Adjust based on available cores
-    )
-
-    # Run sensitivity analysis
-    run_sensitivity_analysis(analysis_config)

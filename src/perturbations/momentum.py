@@ -1,6 +1,7 @@
 import logging
-import numpy as np
 from typing import Optional, Tuple
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -34,17 +35,13 @@ def apply_momentum_perturbation(
     random_perturbation = np.random.normal(0, 1, field_values.shape) + 1j * np.random.normal(
         0, 1, field_values.shape
     )
-    # Avoid division by zero
+    # Normalize the random perturbation
     random_perturbation_norm = np.linalg.norm(random_perturbation)
     if random_perturbation_norm > 1e-10:
-        random_perturbation = (
-            random_perturbation
-            * field_norm
-            * perturbation_intensity
-            / random_perturbation_norm
-        )
-    else:
-        random_perturbation = np.zeros_like(field_values)
+        random_perturbation = random_perturbation / random_perturbation_norm
+
+    # Scale the random perturbation by the perturbation intensity
+    random_perturbation = random_perturbation * perturbation_intensity
 
 
     # Apply momentum if available

@@ -1,11 +1,10 @@
 from dataclasses import dataclass
 
 import numpy as np
+from omegaconf import DictConfig
 
-from src.simulation_config_real_data import SimulationConfig
 
-
-def create_test_pointcloud(config: SimulationConfig) -> np.ndarray:
+def create_test_pointcloud(config: DictConfig) -> np.ndarray:
     """Create a point cloud representing walls of a cubic room centered at origin (0,0,0).
 
     Args:

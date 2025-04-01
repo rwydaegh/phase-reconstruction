@@ -1,15 +1,16 @@
-import pytest
 import numpy as np
+import pytest
 from numpy.testing import assert_allclose, assert_almost_equal
+
+from src.utils.normalized_correlation import normalized_correlation
 
 # Import functions to be tested
 from src.utils.normalized_rmse import normalized_rmse
-from src.utils.normalized_correlation import normalized_correlation
 from src.utils.phase_retrieval_utils import (
+    apply_magnitude_constraint,
+    calculate_error,
     compute_pseudoinverse,
     initialize_field_values,
-    calculate_error,
-    apply_magnitude_constraint,
 )
 
 # --- Tests for normalized_rmse ---
@@ -61,7 +62,7 @@ def test_normalized_correlation_uncorrelated():
 
 def test_normalized_correlation_shifted_scaled():
     """Correlation should be 1 even if inputs are shifted and scaled."""
-    
+
     a = np.array([1.0, 2.0, 3.0, 4.0])
     b = a * 5.0 + 10.0 # Perfectly correlated
     assert_almost_equal(normalized_correlation(a, b), 1.0)
@@ -112,6 +113,79 @@ def test_compute_pseudoinverse_adaptive_regularization(svd_setup):
     assert not np.allclose(H_pinv_non_adaptive, H_pinv_adaptive)
     assert H_pinv_adaptive.shape == (H.shape[1], H.shape[0]) # Shape check again
 
+
+def test_compute_pseudoinverse_adaptive_thresholding():
+    """Test if adaptive regularization correctly thresholds small singular values."""
+    np.random.seed(456)
+    # Create a matrix with known singular values
+    U = np.random.rand(5, 5) + 1j * np.random.rand(5, 5)
+    V = np.random.rand(3, 3) + 1j * np.random.rand(3, 3)
+    # Orthonormalize U and V
+    U, _ = np.linalg.qr(U)
+    V, _ = np.linalg.qr(V)
+    Vh = V.conj().T
+
+    # Define singular values, including small ones
+    singular_values = np.array([10.0, 1.0, 0.01, 0.0001]) # Last two are small
+    S_diag = np.zeros((5, 3), dtype=np.complex128)
+    np.fill_diagonal(S_diag, singular_values[:3]) # Fill diagonal for non-square matrix
+
+    H = U @ S_diag @ Vh # Construct H = U S Vh
+    H = np.asfortranarray(H)
+
+    # Set regularization factor. Adaptive threshold is typically s_max * reg
+    reg = 1e-3 # Threshold will be around 10.0 * 1e-3 = 0.01
+
+    # Compute pseudoinverse WITH adaptive regularization
+    H_pinv_adaptive = compute_pseudoinverse(H, reg, adaptive_regularization=True)
+
+    # Compute pseudoinverse WITHOUT adaptive regularization (Tikhonov)
+    H_pinv_non_adaptive = compute_pseudoinverse(H, reg, adaptive_regularization=False)
+
+    # --- Verification ---
+    # The pseudoinverse H_pinv = V @ S_pinv @ Uh
+    # where S_pinv contains 1/s_i for significant singular values s_i.
+
+    # Expected S_pinv for adaptive regularization using the formula: s / (s^2 + tau^2)
+    # where tau = reg * s_max
+    s = singular_values[:3] # Use the actual singular values
+    s_max = s[0]
+    tau = reg * s_max
+    # Calculate expected inverse based on implementation
+    s_inv_adaptive_expected = s / (s**2 + tau**2)
+    S_pinv_adaptive_expected_diag = np.zeros((3, 5), dtype=np.complex128)
+    np.fill_diagonal(S_pinv_adaptive_expected_diag, s_inv_adaptive_expected)
+    H_pinv_adaptive_expected = V @ S_pinv_adaptive_expected_diag @ U.conj().T
+
+    # Expected S_pinv for non-adaptive (Tikhonov: s_i / (s_i^2 + reg^2)
+    # - approx 1/s_i for large s_i)
+    # Note: The actual implementation uses reg, not reg^2.
+    # Thresholding is s > s_max * reg.
+    # The non-adaptive formula is s_i / (s_i^2 + reg)
+    # - let's re-check the function or test behavior.
+    # Looking at the code: s_inv = s / (s**2 + regularization). This is Tikhonov if reg = alpha^2.
+    # Let's calculate the expected values based on this formula.
+    s = singular_values[:3]
+    s_inv_non_adaptive_expected = s / (s**2 + reg) # Use reg directly as per implementation
+    S_pinv_non_adaptive_expected_diag = np.zeros((3, 5), dtype=np.complex128)
+    np.fill_diagonal(S_pinv_non_adaptive_expected_diag, s_inv_non_adaptive_expected)
+    H_pinv_non_adaptive_expected = V @ S_pinv_non_adaptive_expected_diag @ U.conj().T
+
+    # Compare computed pseudoinverses with expected ones
+    assert_allclose(H_pinv_adaptive, H_pinv_adaptive_expected, atol=1e-6,
+                    err_msg="Adaptive pseudoinverse differs from expected thresholded result.")
+
+    # For non-adaptive, the match might be less exact due to floating point, but should be close
+    assert_allclose(H_pinv_non_adaptive, H_pinv_non_adaptive_expected, atol=1e-6,
+                    err_msg="Non-adaptive pseudoinverse differs from expected Tikhonov result.")
+
+    # Crucially, verify that the adaptive and non-adaptive results differ significantly
+    # especially in how they handle the smallest singular value component.
+    assert not np.allclose(H_pinv_adaptive, H_pinv_non_adaptive, atol=1e-6), (
+        "Adaptive and non-adaptive pseudoinverses should differ significantly."
+    )
+
+
 # --- Tests for initialize_field_values ---
 
 def test_initialize_field_values_shape_and_magnitude():
@@ -137,7 +211,8 @@ def test_calculate_error_simple():
     simulated_magnitude = np.array([3.0, 0.0]) # Diff = [0, -4], Norm of diff = 4
     measured_magnitude_norm = np.linalg.norm(measured_magnitude) # Should be 5.0
     expected_error = 4.0 / 5.0
-    assert_almost_equal(calculate_error(simulated_magnitude, measured_magnitude, measured_magnitude_norm), expected_error)
+    error = calculate_error(simulated_magnitude, measured_magnitude, measured_magnitude_norm)
+    assert_almost_equal(error, expected_error)
 
 def test_calculate_error_zero_norm():
     """Test error calculation when measured norm is zero (should be inf or nan)."""
@@ -145,7 +220,8 @@ def test_calculate_error_zero_norm():
     simulated_magnitude = np.array([1.0, 1.0])
     measured_magnitude_norm = np.linalg.norm(measured_magnitude) # Should be 0.0
     # Division by zero should result in inf
-    assert np.isinf(calculate_error(simulated_magnitude, measured_magnitude, measured_magnitude_norm))
+    error = calculate_error(simulated_magnitude, measured_magnitude, measured_magnitude_norm)
+    assert np.isinf(error)
 
 # --- Tests for apply_magnitude_constraint ---
 
@@ -170,7 +246,9 @@ def test_apply_magnitude_constraint_complex_phase():
     simulated_field = np.array([1 * np.exp(1j * np.pi/4), 4 * np.exp(1j * -np.pi/2)])
     original_phases = np.angle(simulated_field) # [pi/4, -pi/2]
 
-    constrained_field = apply_magnitude_constraint(simulated_field, measured_magnitude).astype(np.complex128)
+    constrained_field = apply_magnitude_constraint(
+        simulated_field, measured_magnitude
+    ).astype(np.complex128)
 
     # Check magnitude matches measured_magnitude
     assert_allclose(np.abs(constrained_field), measured_magnitude)
@@ -180,7 +258,8 @@ def test_apply_magnitude_constraint_complex_phase():
 def test_apply_magnitude_constraint_zero_simulated():
     """Test constraint application when simulated magnitude is zero."""
     measured_magnitude = np.array([1.0, 2.0])
-    simulated_field = np.array([0.0 + 0j, 1.0 + 0j], dtype=np.complex128) # Contains a zero magnitude
+    # Contains a zero magnitude
+    simulated_field = np.array([0.0 + 0j, 1.0 + 0j], dtype=np.complex128)
     constrained_field = apply_magnitude_constraint(simulated_field, measured_magnitude)
 
     # Check magnitude matches measured_magnitude

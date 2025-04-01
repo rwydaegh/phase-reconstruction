@@ -66,7 +66,11 @@ def calculate_error(simulated_magnitude, measured_magnitude, measured_magnitude_
         Relative error
     """
     mag_diff = simulated_magnitude - measured_magnitude
-    error = np.linalg.norm(mag_diff) / measured_magnitude_norm
+    measured_magnitude_norm = np.linalg.norm(measured_magnitude)
+    if measured_magnitude_norm > 1e-10:
+        error = np.linalg.norm(mag_diff) / measured_magnitude_norm
+    else:
+        error = np.inf
     return error
 
 
@@ -92,7 +96,8 @@ def apply_magnitude_constraint(
     # Handle division by zero or near-zero magnitudes
     # Create masks for zero and near-zero simulated magnitudes
     zero_mask = np.abs(simulated_field) < 1e-15 # Mask for exact zeros
-    near_zero_mask = (np.abs(simulated_field) >= 1e-15) & (simulated_magnitude < 1e-10) # Mask for near-zeros
+    # Mask for near-zeros
+    near_zero_mask = (np.abs(simulated_field) >= 1e-15) & (simulated_magnitude < 1e-10)
 
     # Initialize output field values
     field_values = np.zeros_like(simulated_field, dtype=np.complex128)
@@ -101,7 +106,8 @@ def apply_magnitude_constraint(
     if np.any(zero_mask):
         field_values[zero_mask] = measured_magnitude[zero_mask] # Assign magnitude, phase is 0
 
-    # Case 2: Simulated field is near-zero (but not exactly zero) - use small value for stable division
+    # Case 2: Simulated field is near-zero (but not exactly zero)
+    # Use small value for stable division
     if np.any(near_zero_mask):
         # Calculate phase using the original simulated_field to avoid phase distortion
         phase_factor = simulated_field[near_zero_mask] / np.abs(simulated_field[near_zero_mask])
@@ -340,7 +346,11 @@ def perform_intelligent_restart(
 
 
 def create_convergence_plot(
-    errors, perturbation_iterations, restart_iterations, convergence_threshold
+    errors,
+    perturbation_iterations,
+    restart_iterations,
+    convergence_threshold,
+    output_dir: str, # Add output directory argument
 ):
     """Create and save a plot showing the error evolution and perturbation points.
 
@@ -349,10 +359,11 @@ def create_convergence_plot(
         perturbation_iterations: Iterations where perturbations were applied
         restart_iterations: Iterations where restarts occurred
         convergence_threshold: Convergence criterion
+        output_dir: Directory to save the plot file.
     """
     try:
         # Create output directory if it doesn't exist
-        os.makedirs("figs", exist_ok=True)
+        os.makedirs(output_dir, exist_ok=True) # Use the provided output directory
 
         # Calculate rate of change (first derivative of error)
         # Compute differences between consecutive errors, padded with 0 at the beginning
@@ -419,7 +430,7 @@ def create_convergence_plot(
         fig.legend(legend_elements, legend_labels, loc="upper right", bbox_to_anchor=(0.95, 0.95))
 
         plt.tight_layout()
-        plt.savefig("figs/gs_convergence.png", dpi=300)
+        plt.savefig(os.path.join(output_dir, "gs_convergence.png"), dpi=300) # Save to output directory
 
         plt.close()
 

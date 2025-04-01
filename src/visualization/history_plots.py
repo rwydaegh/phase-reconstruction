@@ -16,7 +16,8 @@ def visualize_iteration_history(
     resolution: int,
     measurement_plane: np.ndarray,
     show_plot: bool = True,
-    output_file: Optional[str] = "gs_animation.gif",
+    output_file: Optional[str] = None,
+    animation_filename: str = "gs_animation.gif",
     frame_skip: int = 3,
     perturbation_iterations: Optional[List[int]] = None,
     restart_iterations: Optional[List[int]] = None,
@@ -156,19 +157,23 @@ def visualize_iteration_history(
         measured_magnitude_norm = np.linalg.norm(measured_magnitude)
         for i in range(len(field_history)):
             simulated_magnitude = np.abs(field_history[i])
-            actual_errors[i] = np.linalg.norm(simulated_magnitude - measured_magnitude) / measured_magnitude_norm
+            diff = simulated_magnitude - measured_magnitude
+            actual_errors[i] = np.linalg.norm(diff) / measured_magnitude_norm
     else:
         # If no measured magnitude, use iteration changes as a proxy
         actual_errors = iteration_changes
 
     # Plot error metrics
-    (line_changes,) = ax2.plot(range(len(field_history)), iteration_changes, label="Iter Change (RMSE)")
+    (line_changes,) = ax2.plot(
+        range(len(field_history)), iteration_changes, label="Iter Change (RMSE)"
+    )
     (line_errors,) = ax2.plot(range(len(field_history)), actual_errors, label="Error vs True")
     ax2.set_yscale("log")
 
     # Add convergence threshold line
     ax2.axhline(
-        y=convergence_threshold, color="r", linestyle="--", label=f"Threshold ({convergence_threshold:.1e})"
+        y=convergence_threshold, color="r", linestyle="--",
+        label=f"Threshold ({convergence_threshold:.1e})"
     )
 
     # Add vertical lines for perturbations and restarts
@@ -278,9 +283,10 @@ def visualize_iteration_history(
     if output_file:
         # Use higher FPS for smoother, faster animation
         adjusted_fps = max(10, 30 // final_frame_skip)  # Higher base FPS (10-30 vs 5-15)
-        anim.save(output_file, writer="pillow", fps=adjusted_fps)
+        anim.save(animation_filename, writer="pillow", fps=adjusted_fps)
         print(
-            f"Saved animation to {output_file} (skipping {final_frame_skip-1} frames, fps={adjusted_fps})"
+            f"Saved animation to {output_file} "
+            f"(skipping {final_frame_skip-1} frames, fps={adjusted_fps})"
         )
 
     # Show plot if requested
@@ -299,7 +305,8 @@ def visualize_current_and_field_history(
     resolution: int,
     measurement_plane: np.ndarray,
     show_plot: bool = True,
-    output_file: Optional[str] = "current_field_animation.gif",
+    output_file: Optional[str] = None,
+    animation_filename: str = "current_field_animation.gif",
     frame_skip: int = 3,
 ) -> None:
     """Create animation showing current density history in 3D
@@ -600,7 +607,7 @@ def visualize_current_and_field_history(
     if output_file:
         # Adjust FPS proportionally to maintain similar animation duration
         adjusted_fps = max(5, 15 // frame_skip)
-        anim.save(output_file, writer="pillow", fps=adjusted_fps)
+        anim.save(animation_filename, writer="pillow", fps=adjusted_fps)
         print(
             f"Saved animation to {output_file} (skipping {frame_skip-1} frames, fps={adjusted_fps})"
         )

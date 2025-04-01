@@ -4,13 +4,12 @@ Module for handling data input/output operations.
 """
 
 import logging
-import pickle
-import numpy as np
 import os
+import pickle
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
-
-
 
 def load_measurement_data(file_path):
     """
@@ -18,8 +17,6 @@ def load_measurement_data(file_path):
     """
     with open(file_path, "rb") as f:
         data = pickle.load(f)
-
-    logger.info(f"Loaded measurement data with keys: {list(data.keys())}")
 
     results = data["results"]
     continuous_axis = data["continuous_axis"]
@@ -39,21 +36,11 @@ def load_measurement_data(file_path):
                 processed_results.append(signal)
         results = np.array(processed_results).astype(float)
 
+    if isinstance(points_continuous, list):
+        points_continuous = np.array(points_continuous)
+
     if isinstance(points_discrete, list):
         points_discrete = np.array(points_discrete)
-
-    logger.info(f"Measurement data shape: {results.shape}")
-    logger.info(
-        f"Continuous axis ({continuous_axis}): {len(points_continuous)} points from "
-        f"{np.min(points_continuous):.1f} to {np.max(points_continuous):.1f} mm"
-    )
-    logger.info(
-        f"Discrete axis ({discrete_axis}): {len(points_discrete)} points from "
-        f"{np.min(points_discrete):.1f} to {np.max(points_discrete):.1f} mm"
-    )
-    logger.info(
-        f"Frequency: {frequency/1e9:.2f} GHz (wavelength: {299792458/(frequency/1e9)/1e6:.2f} mm)"
-    )
 
     return {
         "results": results,

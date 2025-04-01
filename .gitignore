@@ -68,6 +68,7 @@ Thumbs.db
 # Project specific
 *.log
 
+roo-code-settings.json
 # Large data files
 *.pkl
 *.pickle
@@ -96,3 +97,5 @@ perturbation_results/
 real_data_results/
 sensitivity_results/
 smoothing_results/
+
+**/__pycache__/

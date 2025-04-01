@@ -1,12 +1,12 @@
 # conf/sensitivity_analysis.yaml
 
 defaults:
-  - base_simulation: simulated_data # Choose default simulation config (simulated_data or measured_data)
+  - simulated_data # Load conf/simulated_data.yaml directly
   - _self_ # Allows overriding parameters defined here
 
 # Parameters specific to sensitivity analysis execution
 output_dir: "sensitivity_results"
-parallel: True
+parallel: False # Disabled parallel execution
 max_workers: 4
 
 # Define parameter ranges to analyze
@@ -15,28 +15,28 @@ parameter_ranges:
   - param_name: "wall_points"
     start: 4
     end: 12
-    num_steps: 5
+    num_steps: 3 # Reduced for faster run
     log_scale: False
   - param_name: "num_sources"
     start: 10
     end: 200
-    num_steps: 5
+    num_steps: 3 # Reduced for faster run
     log_scale: True
-  - param_name: "resolution"
-    start: 10
-    end: 60
-    num_steps: 4
-    log_scale: False
-  - param_name: "gs_iterations"
-    start: 50
-    end: 300
-    num_steps: 4
-    log_scale: False
-  - param_name: "convergence_threshold"
-    start: 1e-4
-    end: 1e-2
-    num_steps: 4
-    log_scale: True
+#  - param_name: "resolution"
+#    start: 10
+#    end: 60
+#    num_steps: 3 # Reduced for faster run
+#    log_scale: False
+#  - param_name: "gs_iterations"
+#    start: 50
+#    end: 300
+#    num_steps: 3 # Reduced for faster run
+#    log_scale: False
+#  - param_name: "convergence_threshold"
+#    start: 1e-4
+#    end: 1e-2
+#    num_steps: 3 # Reduced for faster run
+#    log_scale: True
   # Add other parameters like wavelength, room_size etc. if needed for analysis
 
 # Hydra specific config (can be inherited or overridden)

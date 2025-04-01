@@ -5,9 +5,11 @@ This produces multiple comparisons to ensure our findings are correct.
 """
 
 import argparse
+import math
 import os
 import random
 import sys
+from dataclasses import dataclass, field
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -15,11 +17,46 @@ from mpl_toolkits.mplot3d import Axes3D
 
 from create_channel_matrix import create_channel_matrix
 from create_test_pointcloud import create_test_pointcloud
-from holographic_phase_retrieval import holographic_phase_retrieval
-
+from src.algorithms.gerchberg_saxton import holographic_phase_retrieval
+from src.visualization.utils import visualize_field
 from utils.normalized_correlation import normalized_correlation
 from utils.normalized_rmse import normalized_rmse
-from src.visualization.utils import visualize_field
+
+
+@dataclass
+class SimulationConfig:
+    wavelength: float = 10.7e-3
+    plane_size: float = 1.0
+    resolution: int = 30
+    room_size: float = 2.0
+    wall_points: int = 10
+    num_sources: int = 50
+    gs_iterations: int = 200
+    convergence_threshold: float = 1e-3
+    perturb_points: bool = False
+    perturbation_factor: float = 0.0
+    amplitude_sigma: float = 1.0 # Added default based on generate_currents usage
+    # Added default based on reconstruct_field_from_magnitude usage
+    adaptive_regularization: bool = False
+    regularization: float = 1e-4 # Added default based on reconstruct_field_from_magnitude usage
+    # Added default based on reconstruct_field_from_magnitude usage
+    enable_perturbations: bool = False
+    stagnation_window: int = 50 # Added default based on reconstruct_field_from_magnitude usage
+    # Added default based on reconstruct_field_from_magnitude usage
+    stagnation_threshold: float = 1e-5
+    # Added default based on reconstruct_field_from_magnitude usage
+    perturbation_intensity: float = 0.1
+    perturbation_mode: str = "basic" # Added default based on reconstruct_field_from_magnitude usage
+    # Added default based on reconstruct_field_from_magnitude usage
+    constraint_skip_iterations: int = 0
+    momentum_factor: float = 0.5 # Added default based on reconstruct_field_from_magnitude usage
+    temperature: float = 1.0 # Added default based on reconstruct_field_from_magnitude usage
+    verbose: bool = True
+    no_plot: bool = False # Added default based on reconstruct_field_from_magnitude usage
+    k: float = field(init=False)
+
+    def __post_init__(self):
+        self.k = 2 * math.pi / self.wavelength
 
 
 def parse_args():
@@ -153,7 +190,8 @@ def evaluate_reconstruction(true_field, reconstructed_field, title):
     rmse_val = normalized_rmse(np.abs(true_field), np.abs(reconstructed_field))
     corr_val = normalized_correlation(np.abs(true_field), np.abs(reconstructed_field))
 
-    print(f"{title} - RMSE: {rmse_val:.6f}, Correlation: {corr_val:.6f}")
+    # print(f"{title} - RMSE: {rmse_val:.6f}, Correlation: {corr_val:.6f}")
+    # Commented out for less verbosity
     return rmse_val, corr_val
 
 
@@ -421,8 +459,10 @@ def main():
     original_source_indices = None
 
     for factor in perturbation_factors:
-        print(f"\n--- Testing perturbation factor {factor} ---")
+        # print(f"\n--- Testing perturbation factor {factor} ---")
+        # Commented out for less verbosity
 
+        config = setup_simulation(args, factor)
 
         perturbed_points = create_test_pointcloud(config)
 
@@ -473,10 +513,12 @@ def main():
                 np.abs(original_true_field), np.abs(original_recon_field)
             ),
         }
-        print(
-            f"Original recon vs Original true - RMSE: {original_vs_original_metrics['rmse']:.6f}, "
-            f"Correlation: {original_vs_original_metrics['correlation']:.6f}"
-        )
+        # print(
+        #     f"Original recon vs Original true - "
+        #     f"RMSE: {original_vs_original_metrics['rmse']:.6f}, "
+        #     f"Correlation: {original_vs_original_metrics['correlation']:.6f}"
+        # )
+        # Commented out for less verbosity
 
 
 
@@ -494,11 +536,11 @@ def main():
                 np.abs(original_true_field), np.abs(forward_field)
             ),
         }
-        print(
-            f"Perturbed model (true currents) vs Original true - "
-            f"RMSE: {perturbed_forward_metrics['rmse']:.6f}, "
-            f"Correlation: {perturbed_forward_metrics['correlation']:.6f}"
-        )
+        # print(
+        #     f"Perturbed model (true currents) vs Original true - "
+        #     f"RMSE: {perturbed_forward_metrics['rmse']:.6f}, "
+        #     f"Correlation: {perturbed_forward_metrics['correlation']:.6f}"
+        # ) # Commented out for less verbosity
 
 
 
@@ -520,11 +562,11 @@ def main():
                 np.abs(original_true_field), np.abs(perturbed_overfitting_field)
             ),
         }
-        print(
-            f"Perturbed model (optimized currents) vs Original true - "
-            f"RMSE: {perturbed_overfitting_metrics['rmse']:.6f}, "
-            f"Correlation: {perturbed_overfitting_metrics['correlation']:.6f}"
-        )
+        # print(
+        #     f"Perturbed model (optimized currents) vs Original true - "
+        #     f"RMSE: {perturbed_overfitting_metrics['rmse']:.6f}, "
+        #     f"Correlation: {perturbed_overfitting_metrics['correlation']:.6f}"
+        # ) # Commented out for less verbosity
 
         print("\nSCENARIO 3: Perturbed reconstruction vs Perturbed true field")
         perturbed_self_recon_field, _ = reconstruct_field_from_magnitude(
@@ -540,11 +582,11 @@ def main():
                 np.abs(perturbed_true_field), np.abs(perturbed_self_recon_field)
             ),
         }
-        print(
-            f"Perturbed recon vs Perturbed true - "
-            f"RMSE: {perturbed_vs_perturbed_metrics['rmse']:.6f}, "
-            f"Correlation: {perturbed_vs_perturbed_metrics['correlation']:.6f}"
-        )
+        # print(
+        #     f"Perturbed recon vs Perturbed true - "
+        #     f"RMSE: {perturbed_vs_perturbed_metrics['rmse']:.6f}, "
+        #     f"Correlation: {perturbed_vs_perturbed_metrics['correlation']:.6f}"
+        # ) # Commented out for less verbosity
 
         # Store all results for this perturbation factor
         results = {

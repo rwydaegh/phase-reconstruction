@@ -1,5 +1,6 @@
 import logging
 import os
+from pathlib import Path
 from typing import Optional
 
 import matplotlib.pyplot as plt
@@ -19,7 +20,7 @@ def visualize_fields(
     rmse: float,
     correlation: float,
     show_plot: bool = True,
-    output_file: Optional[str] = None,
+    output_dir: str = "/figs",
 ) -> None:
     """Visualize the true field, measured magnitude, and reconstructed field.
 
@@ -211,9 +212,10 @@ def visualize_fields(
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])  # Adjust rect to make space for suptitle
 
     # Save or show plot
-    if output_file:
-        plt.savefig(output_file, dpi=300)
-        logger.info(f"Saved visualization to {output_file}")
+    if output_dir:
+        filename = Path(output_dir) / f"field_visualization_{plane_type}.png"
+        plt.savefig(filename, dpi=300, bbox_inches="tight")
+        logger.info(f"Saved visualization to {filename}")
 
     if show_plot:
         plt.show()
