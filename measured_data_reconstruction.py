@@ -138,15 +138,8 @@ def main(cfg: DictConfig) -> None:
 
         if isinstance(data, np.ndarray):
             if data.shape[1] >= 3:
-                full_points = downsample_pointcloud(data, cfg.pointcloud_downsample)
-
-                logger.info(
-                    f"Downsampled point cloud from {len(data)} to {len(full_points)} points "
-                    f"(factor: {cfg.pointcloud_downsample})"
-                )
-
                 translation = np.array([-5.35211, -6.34833, -1.28819])
-                points = full_points[:, :3] + translation  # Adding negative values = subtraction
+                points = data[:, :3] + translation  # Adding negative values = subtraction
                 logger.info(f"Translated point cloud by {translation} meters")
 
                 if hasattr(cfg, "max_distance_from_origin") and cfg.max_distance_from_origin != -1:
@@ -171,10 +164,10 @@ def main(cfg: DictConfig) -> None:
             raise ValueError(f"Source point cloud data has unexpected type: {type(data)}")
 
         # Expecting preprocessed format: x,y,z, dist, nx,ny,nz, t1x,t1y,t1z, t2x,t2y,t2z (13 cols)
-        if full_points.shape[1] == 13:
+        if data.shape[1] == 13:
             # Extract tangents after downsampling and translation
-            tangents1_full = full_points[:, 7:10]
-            tangents2_full = full_points[:, 10:13]
+            tangents1_full = data[:, 7:10]
+            tangents2_full = data[:, 10:13]
             # Filter tangents based on distance filtering applied to points
             if hasattr(cfg, "max_distance_from_origin") and cfg.max_distance_from_origin != -1:
                 tangents1 = tangents1_full[distances <= cfg.max_distance_from_origin]
@@ -188,12 +181,12 @@ def main(cfg: DictConfig) -> None:
             logger.info(f"  Tangents1 shape: {tangents1.shape}")
             logger.info(f"  Tangents2 shape: {tangents2.shape}")
 
-        elif full_points.shape[1] == 7:
+        elif data.shape[1] == 7:
             logger.warning(
                 f"Loaded point cloud from {cfg.source_pointcloud_path} has only 7 columns. Calculating tangents and overwriting the file..."
             )
             # Calculate tangents based on the full (downsampled) point cloud normals
-            normals_full = full_points[:, 4:7]  # Assuming columns 4, 5, 6 are nx, ny, nz
+            normals_full = data[:, 4:7]  # Assuming columns 4, 5, 6 are nx, ny, nz
             from src.utils.preprocess_pointcloud import get_tangent_vectors
 
             tangents1_full, tangents2_full = get_tangent_vectors(normals_full)
@@ -202,7 +195,7 @@ def main(cfg: DictConfig) -> None:
             )
 
             # Combine original full data with full tangents
-            output_data_full = np.hstack((full_points, tangents1_full, tangents2_full))
+            output_data_full = np.hstack((data, tangents1_full, tangents2_full))
 
             # Overwrite the original file with the full preprocessed data
             logger.info(
@@ -231,7 +224,7 @@ def main(cfg: DictConfig) -> None:
             logger.info(f"Filtered tangents. t1: {tangents1.shape}, t2: {tangents2.shape}")
         else:
             raise ValueError(
-                f"Loaded point cloud data has unexpected shape: {full_points.shape}. Expected 7 or 13 columns."
+                f"Loaded point cloud data has unexpected shape: {data.shape}. Expected 7 or 13 columns."
             )
 
         logger.info(f"Using real data point cloud with {len(points)} points, shape: {points.shape}")
@@ -278,6 +271,20 @@ def main(cfg: DictConfig) -> None:
                 raise RuntimeError(
                     "Vector model selected but tangents could not be loaded or calculated from source file."
                 )
+
+    # Downsample point cloud if requested
+    if cfg.pointcloud_downsample > 1:
+        original_point_count = len(points)
+        points = downsample_pointcloud(points, cfg.pointcloud_downsample)
+        logger.info(
+            f"Downsampled point cloud from {original_point_count} to {len(points)} points "
+            f"(factor: {cfg.pointcloud_downsample})"
+        )
+        # Downsample tangents if they exist and vector model is used
+        if cfg.use_vector_model and "tangents1" in locals() and "tangents2" in locals():
+            tangents1 = downsample_pointcloud(tangents1, cfg.pointcloud_downsample)
+            tangents2 = downsample_pointcloud(tangents2, cfg.pointcloud_downsample)
+            logger.info("Downsampled corresponding tangent vectors.")
 
     # Get measurement direction from config
     try:

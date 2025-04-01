@@ -16,7 +16,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 # Local application imports
-import simulated_data_reconstruction
+import simulated_data_reconstruction  # noqa: E402
 
 # Configure logging (after imports and path modification)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")

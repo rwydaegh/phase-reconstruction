@@ -10,6 +10,7 @@ defaults:
 # Override parameters for simulated data simulation
 resolution: 50
 use_source_pointcloud: False # Override to disable source point cloud for simulated data
+perturb_points: True          # Enable point cloud perturbation
 perturbation_factor: 0.05
 perturbation_mode: "basic" # Original default for simulated data
 enable_perturbations: False # Original default for simulated data
