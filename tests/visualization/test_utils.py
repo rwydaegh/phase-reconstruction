@@ -17,14 +17,14 @@ from src.visualization.utils import visualize_field, visualize_point_cloud
 def vis_data():
     """Provides sample data for visualization tests."""
     np.random.seed(42)
-    resolution = 4 # Small resolution for testing
+    resolution = 4  # Small resolution for testing
     field_size = resolution * resolution
     field = np.random.rand(field_size) + 1j * np.random.rand(field_size)
     x = np.linspace(-0.5, 0.5, resolution)
     y = np.linspace(-0.5, 0.5, resolution)
 
     num_points = 10
-    points = np.random.rand(num_points, 3) * 2.0 # Room size 2.0
+    points = np.random.rand(num_points, 3) * 2.0  # Room size 2.0
     currents = np.random.rand(num_points) + 1j * np.random.rand(num_points)
     highlight_indices = [1, 3, 5]
 
@@ -33,7 +33,7 @@ def vis_data():
     mp_x = np.linspace(0.2, 0.8, mp_res)
     mp_y = np.linspace(0.2, 0.8, mp_res)
     MP_X, MP_Y = np.meshgrid(mp_x, mp_y)
-    measurement_plane = np.stack([MP_X, MP_Y, np.ones_like(MP_X) * 1.0], axis=-1) # Plane at z=1.0
+    measurement_plane = np.stack([MP_X, MP_Y, np.ones_like(MP_X) * 1.0], axis=-1)  # Plane at z=1.0
 
     return {
         "field": field,
@@ -44,8 +44,9 @@ def vis_data():
         "currents": currents,
         "highlight_indices": highlight_indices,
         "measurement_plane": measurement_plane,
-        "room_size": 2.0
+        "room_size": 2.0,
     }
+
 
 # Test functions will be added below
 

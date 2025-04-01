@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.ndimage import gaussian_filter
 
+
 def gaussian_kernel_2d(size, sigma):
     """
     Generate a 2D Gaussian kernel with specified size and sigma
@@ -17,7 +18,7 @@ def gaussian_kernel_2d(size, sigma):
         # Return a kernel with a single peak at the center or handle as appropriate
         # For simplicity, returning the current 'g' which might be all zeros or contain NaNs
         # A better approach might be to return an identity kernel or raise an error
-        return g # Or handle appropriately, e.g., raise ValueError("Invalid kernel parameters")
+        return g  # Or handle appropriately, e.g., raise ValueError("Invalid kernel parameters")
     return g / g_sum  # Normalize
 
 
@@ -31,7 +32,7 @@ def gaussian_convolution_local_support(data, R_pixels):
 
     # Calculate sigma based on R (standard choice: sigma = R/3)
     # Ensure sigma is positive
-    sigma = max(R_pixels / 3.0, 1e-9) # Use max to avoid non-positive sigma
+    sigma = max(R_pixels / 3.0, 1e-9)  # Use max to avoid non-positive sigma
 
     # Use scipy's gaussian_filter for efficient implementation
     # Use reflect mode to handle boundaries better for physical data
@@ -55,12 +56,14 @@ def physical_to_pixel_radius(R_mm, points_continuous, points_discrete):
             len(points_continuous) - 1
         )
     else:
-        cont_spacing = 1.0 # Assign a default or handle as error
+        cont_spacing = 1.0  # Assign a default or handle as error
 
     if len(points_discrete) > 1:
-        disc_spacing = (np.max(points_discrete) - np.min(points_discrete)) / (len(points_discrete) - 1)
+        disc_spacing = (np.max(points_discrete) - np.min(points_discrete)) / (
+            len(points_discrete) - 1
+        )
     else:
-        disc_spacing = 1.0 # Assign a default or handle as error
+        disc_spacing = 1.0  # Assign a default or handle as error
 
     # Check for zero spacing
     if cont_spacing == 0 or disc_spacing == 0:
@@ -69,13 +72,13 @@ def physical_to_pixel_radius(R_mm, points_continuous, points_discrete):
         # print("Warning: Zero spacing detected in one or both dimensions.")
         # For now, use a small default if one is zero, or average if both > 0
         if cont_spacing == 0 and disc_spacing == 0:
-             avg_spacing = 1.0 # Or raise error
+            avg_spacing = 1.0  # Or raise error
         elif cont_spacing == 0:
-             avg_spacing = disc_spacing
+            avg_spacing = disc_spacing
         elif disc_spacing == 0:
-             avg_spacing = cont_spacing
-        else: # Should not happen based on logic, but for completeness
-             avg_spacing = (cont_spacing + disc_spacing) / 2
+            avg_spacing = cont_spacing
+        else:  # Should not happen based on logic, but for completeness
+            avg_spacing = (cont_spacing + disc_spacing) / 2
     else:
         # Average spacing
         avg_spacing = (cont_spacing + disc_spacing) / 2
@@ -84,7 +87,7 @@ def physical_to_pixel_radius(R_mm, points_continuous, points_discrete):
     if avg_spacing == 0:
         # raise ValueError("Average spacing cannot be zero.")
         # Or return a default pixel value
-        return 1.0 # Default to 1 pixel radius
+        return 1.0  # Default to 1 pixel radius
 
     # Convert R in mm to pixels
     R_pixels = R_mm / avg_spacing

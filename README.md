@@ -107,7 +107,7 @@ The `SimulationConfig` class provides configurable parameters including:
 
 The algorithm generates several output files:
 
-- `results.png`: Final field comparison 
+- `results.png`: Final field comparison
 - `gs_animation.gif`: Animation of the GS iteration process
 - `current_field_animation.gif`: Animation of current distribution and field reconstruction
 

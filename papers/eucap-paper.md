@@ -24,7 +24,7 @@ According to the Huygens-Fresnel principle, every wavefront is the sum of a numb
 
 $\mathbf{e}(\mathbf{r}) = -j\omega \mu_0 \int_S \overline{\overline{\mathbf{G}}}(\mathbf{r}, \mathbf{r}') \cdot \mathbf{j}(\mathbf{r}') \, \mathrm{d}\mathbf{r}' \, ,$
 
-where $\mathbf{j}$ is the current density on the physical features of the environment $S$. Green's tensor $\overline{\overline{\mathbf{G}}}$ is explicitly given by 
+where $\mathbf{j}$ is the current density on the physical features of the environment $S$. Green's tensor $\overline{\overline{\mathbf{G}}}$ is explicitly given by
 
 $\overline{\overline{\mathbf{G}}}(\mathbf{r},\mathbf{r}') = \left( \mathbf{I} + \frac{1}{k^2} \boldsymbol{\nabla\nabla} \right) G(R) \, ,$
 
@@ -66,7 +66,7 @@ This equation can be solved for the cluster coefficients in a least-squares sens
 $\mathbf{x} = \mathbf{H}^{+} \mathbf{y} =
 \begin{bmatrix}
 \mathbf{V}_\theta\mathbf{\Sigma_\theta}^{+}\mathbf{U}_\theta^H & \\
-& \mathbf{V}_\phi\mathbf{\Sigma_\phi}^{+}\mathbf{U}_\phi^H 
+& \mathbf{V}_\phi\mathbf{\Sigma_\phi}^{+}\mathbf{U}_\phi^H
 \end{bmatrix}
 \mathbf{y} \, ,$
 

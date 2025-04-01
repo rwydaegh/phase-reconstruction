@@ -39,7 +39,10 @@ def visualize_iteration_history(
     """
     # Determine plane type and set appropriate axis labels
     x_min, x_max = np.min(measurement_plane[:, :, 0]), np.max(measurement_plane[:, :, 0])
-    y_min, _ = np.min(measurement_plane[:, :, 1]), np.max(measurement_plane[:, :, 1]) # y_max unused
+    y_min, _ = (
+        np.min(measurement_plane[:, :, 1]),
+        np.max(measurement_plane[:, :, 1]),
+    )  # y_max unused
     _, _ = np.min(measurement_plane[:, :, 2]), np.max(measurement_plane[:, :, 2])
     # z_min, z_max unused
 
@@ -172,8 +175,10 @@ def visualize_iteration_history(
 
     # Add convergence threshold line
     ax2.axhline(
-        y=convergence_threshold, color="r", linestyle="--",
-        label=f"Threshold ({convergence_threshold:.1e})"
+        y=convergence_threshold,
+        color="r",
+        linestyle="--",
+        label=f"Threshold ({convergence_threshold:.1e})",
     )
 
     # Add vertical lines for perturbations and restarts
@@ -188,7 +193,7 @@ def visualize_iteration_history(
             restart_lines.append(ax2.axvline(x=r_iter, color="m", linestyle="-.", alpha=0.7))
 
     # Create legend for error lines and threshold
-    legend_elements = [line_changes, line_errors, ax2.lines[-1]] # Get the threshold line
+    legend_elements = [line_changes, line_errors, ax2.lines[-1]]  # Get the threshold line
     legend_labels = ["Iter Change", "Error vs True", f"Threshold ({convergence_threshold:.1e})"]
 
     # Add perturbation/restart lines to legend if they exist
@@ -387,16 +392,28 @@ def visualize_current_and_field_history(
 
     # Initial 3D scatter plot of points with current densities (top left)
     # Calculate combined magnitude per point from the two components
-    coeffs_frame_0 = coefficient_history[0] # Shape (2*N_c,)
-    coeffs_t1_0 = coeffs_frame_0[0::2]      # Shape (N_c,)
-    coeffs_t2_0 = coeffs_frame_0[1::2]      # Shape (N_c,)
-    current_mags_per_point_0 = np.sqrt(np.abs(coeffs_t1_0)**2 + np.abs(coeffs_t2_0)**2) # Shape (N_c,)
+    coeffs_frame_0 = coefficient_history[0]
+    num_points = points.shape[0]
+    num_coeffs = coeffs_frame_0.shape[0]
+
+    if num_coeffs == num_points:  # Scalar model
+        current_mags_per_point_0 = np.abs(coeffs_frame_0)
+    elif num_coeffs == 2 * num_points:  # Vector model
+        coeffs_t1_0 = coeffs_frame_0[0::2]
+        coeffs_t2_0 = coeffs_frame_0[1::2]
+        current_mags_per_point_0 = np.sqrt(np.abs(coeffs_t1_0) ** 2 + np.abs(coeffs_t2_0) ** 2)
+    else:
+        raise ValueError(
+            f"Unexpected coefficient shape: {coeffs_frame_0.shape} for {num_points} points."
+        )
 
     if current_mags_per_point_0.shape[0] != points.shape[0]:
-         raise ValueError(f"Mismatch between points ({points.shape[0]}) and calculated current magnitudes ({current_mags_per_point_0.shape[0]})")
+        raise ValueError(
+            f"Mismatch between points ({points.shape[0]}) and calculated current magnitudes ({current_mags_per_point_0.shape[0]})"
+        )
 
     max_mag_0 = np.max(current_mags_per_point_0)
-    if max_mag_0 > 1e-9: # Use a small tolerance instead of > 0
+    if max_mag_0 > 1e-9:  # Use a small tolerance instead of > 0
         normalized_mags = current_mags_per_point_0 / max_mag_0
         sizes = 0.5 + 150 * normalized_mags**2
         alphas = 0.2 + 0.8 * normalized_mags
@@ -408,7 +425,7 @@ def visualize_current_and_field_history(
         points[:, 0],
         points[:, 1],
         points[:, 2],
-        c=current_mags_per_point_0, # Use combined magnitude for color
+        c=current_mags_per_point_0,  # Use combined magnitude for color
         s=sizes,
         cmap="plasma",
         alpha=alphas,
@@ -532,13 +549,23 @@ def visualize_current_and_field_history(
 
         # Update current density scatter plot
         # Calculate combined magnitude per point for the current frame
-        coeffs_frame_i = selected_coefficient_history[i] # Shape (2*N_c,)
-        coeffs_t1_i = coeffs_frame_i[0::2]          # Shape (N_c,)
-        coeffs_t2_i = coeffs_frame_i[1::2]          # Shape (N_c,)
-        current_mags_per_point_i = np.sqrt(np.abs(coeffs_t1_i)**2 + np.abs(coeffs_t2_i)**2) # Shape (N_c,)
+        coeffs_frame_i = selected_coefficient_history[i]
+        num_coeffs_i = coeffs_frame_i.shape[0]
+
+        if num_coeffs_i == num_points:  # Scalar model
+            current_mags_per_point_i = np.abs(coeffs_frame_i)
+        elif num_coeffs_i == 2 * num_points:  # Vector model
+            coeffs_t1_i = coeffs_frame_i[0::2]
+            coeffs_t2_i = coeffs_frame_i[1::2]
+            current_mags_per_point_i = np.sqrt(np.abs(coeffs_t1_i) ** 2 + np.abs(coeffs_t2_i) ** 2)
+        else:
+            # This should ideally not happen if the initial check passed
+            raise ValueError(
+                f"Unexpected coefficient shape in frame {i}: {coeffs_frame_i.shape} for {num_points} points."
+            )
 
         max_mag_i = np.max(current_mags_per_point_i)
-        if max_mag_i > 1e-9: # Use a small tolerance
+        if max_mag_i > 1e-9:  # Use a small tolerance
             normalized_mags = current_mags_per_point_i / max_mag_i
             sizes = 0.5 + 150 * normalized_mags**2
             alphas = 0.2 + 0.8 * normalized_mags
@@ -550,7 +577,7 @@ def visualize_current_and_field_history(
             points[:, 0],
             points[:, 1],
             points[:, 2],
-            c=current_mags_per_point_i, # Use combined magnitude for color
+            c=current_mags_per_point_i,  # Use combined magnitude for color
             s=sizes,
             cmap="plasma",
             alpha=alphas,

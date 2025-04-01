@@ -21,11 +21,11 @@ logger = logging.getLogger(__name__)
 
 
 def holographic_phase_retrieval(
-    cfg: DictConfig, # Use cfg object
+    cfg: DictConfig,  # Use cfg object
     channel_matrix: np.ndarray,
     measured_magnitude: np.ndarray,
     initial_field_values: Optional[np.ndarray] = None,
-    output_dir: Optional[str] = None, # Add output directory parameter
+    output_dir: Optional[str] = None,  # Add output directory parameter
 ):
     """
     Basic holographic phase retrieval algorithm based on Gerchberg-Saxton with
@@ -93,7 +93,7 @@ def holographic_phase_retrieval(
     # Flag to control constraint skipping after perturbation
     skip_constraint_counter = 0
 
-    for i in range(cfg.gs_iterations): # Use cfg.gs_iterations
+    for i in range(cfg.gs_iterations):  # Use cfg.gs_iterations
         # 1. Compute cluster coefficients
         cluster_coefficients = H_pinv @ field_values
 
@@ -109,14 +109,14 @@ def holographic_phase_retrieval(
                 #     f"Iter {i}: START OF ITERATION (Post-Coeff Calc). "
                 #     f"RMSE: {start_rmse:.4e}"
                 # )
-                pass # Keep debug structure but remove old error calc for now
+                pass  # Keep debug structure but remove old error calc for now
                 if skip_constraint_counter > 0:
                     logger.info(
                         f"Iter {i}: CONSTRAINT SKIPPING ACTIVE. "
                         f"Remaining: {skip_constraint_counter}"
                     )
             except Exception:
-                 # This might happen if cluster_coefficients calculation failed, though unlikely
+                # This might happen if cluster_coefficients calculation failed, though unlikely
                 logger.debug(
                     f"Iter {i}: START OF ITERATION (Post-Coeff Calc). "
                     f"Cannot estimate start RMSE."
@@ -143,7 +143,7 @@ def holographic_phase_retrieval(
             progress = (i + 1) / cfg.gs_iterations * 100
             # Use sys.stdout.write for overwriting
             sys.stdout.write(f"\rGS Progress: {progress:.1f}%")
-            sys.stdout.flush() # Ensure it's written immediately
+            sys.stdout.flush()  # Ensure it's written immediately
 
         # Save best coefficients
         if rmse < best_rmse:
@@ -209,7 +209,7 @@ def holographic_phase_retrieval(
                 # Start tracking post-perturbation progress
                 current_tracking = {
                     "start_iter": i,
-                    "start_rmse": rmse, # Track starting RMSE
+                    "start_rmse": rmse,  # Track starting RMSE
                     # Initialize with current rmse
                     # F821: error undefined, use rmse
                     "final_rmse": rmse,
@@ -228,7 +228,7 @@ def holographic_phase_retrieval(
                 # Momentum-based perturbation
                 field_values, previous_momentum = apply_momentum_perturbation(
                     field_values,
-                    rmse, # Pass current rmse as the error metric # F821: error undefined, use rmse
+                    rmse,  # Pass current rmse as the error metric # F821: error undefined, use rmse
                     previous_momentum,
                     i,
                     cfg.perturbation_intensity,
@@ -239,7 +239,7 @@ def holographic_phase_retrieval(
                 # Start tracking post-perturbation progress
                 current_tracking = {
                     "start_iter": i,
-                    "start_rmse": rmse, # Track starting RMSE
+                    "start_rmse": rmse,  # Track starting RMSE
                     # Initialize with current rmse
                     # F821: error undefined, use rmse
                     "final_rmse": rmse,
@@ -259,7 +259,7 @@ def holographic_phase_retrieval(
                 field_values = apply_archived_complex_strategies(
                     field_values,
                     cluster_coefficients,
-                    rmse, # Pass current rmse as the error metric # F821: error undefined, use rmse
+                    rmse,  # Pass current rmse as the error metric # F821: error undefined, use rmse
                     i,
                     cfg.perturbation_intensity,
                     cfg.temperature,
@@ -269,7 +269,7 @@ def holographic_phase_retrieval(
                 # Start tracking post-perturbation progress
                 current_tracking = {
                     "start_iter": i,
-                    "start_rmse": rmse, # Track starting RMSE
+                    "start_rmse": rmse,  # Track starting RMSE
                     # Initialize with current rmse
                     # F821: error undefined, use rmse
                     "final_rmse": rmse,
@@ -287,8 +287,7 @@ def holographic_phase_retrieval(
         # If we're tracking post-perturbation progress and hit the end of tracking window
         is_tracking = current_tracking is not None
         tracking_window_elapsed = (
-            i - current_tracking["start_iter"] >= cfg.stagnation_window
-            if is_tracking else False
+            i - current_tracking["start_iter"] >= cfg.stagnation_window if is_tracking else False
         )
         if is_tracking and tracking_window_elapsed:
             current_tracking["final_rmse"] = rmse
@@ -323,13 +322,13 @@ def holographic_phase_retrieval(
     # Prepare statistics about perturbation effectiveness
     stats = {
         "iterations": i + 1,
-        "final_rmse": rmse, # Use RMSE
-        "best_rmse": best_rmse, # Use RMSE
+        "final_rmse": rmse,  # Use RMSE
+        "best_rmse": best_rmse,  # Use RMSE
         "num_perturbations": len(perturbation_iterations),
         "perturbation_iterations": perturbation_iterations,
         # Note: tracking dict now uses 'start_rmse', 'final_rmse'
         "post_perturbation_tracking": post_perturbation_tracking,
-        "rmse_history": rmse_history, # Use RMSE
+        "rmse_history": rmse_history,  # Use RMSE
     }
 
     if cfg.verbose:

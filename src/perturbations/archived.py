@@ -60,7 +60,7 @@ def apply_archived_complex_strategies(
             temperature,
             iteration,
             field_values.copy(),  # Use current field as "previous" since we don't track
-            verbose=True, # Keep verbose logging from the archived function
+            verbose=True,  # Keep verbose logging from the archived function
         )
 
         logger.info(f"Iter {iteration}: Applied ARCHIVED STRATEGY {strategy}")
@@ -79,11 +79,9 @@ def apply_archived_complex_strategies(
         )
         perturbation_norm = np.linalg.norm(perturbation)
         if perturbation_norm > 1e-10:
-             perturbation = (
-                 perturbation * field_norm * perturbation_intensity / perturbation_norm
-             )
+            perturbation = perturbation * field_norm * perturbation_intensity / perturbation_norm
         else:
-             perturbation = np.zeros_like(field_values)
+            perturbation = np.zeros_like(field_values)
 
         # Apply perturbation
         perturbed_values = field_values + perturbation

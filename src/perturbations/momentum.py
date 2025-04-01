@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 def apply_momentum_perturbation(
     field_values: np.ndarray,
-    current_error: float, # Note: current_error is passed but not used in this implementation
+    current_error: float,  # Note: current_error is passed but not used in this implementation
     previous_momentum: Optional[np.ndarray],
     iteration: int,
     intensity: float = 0.2,
@@ -43,7 +43,6 @@ def apply_momentum_perturbation(
     # Scale the random perturbation by the perturbation intensity
     random_perturbation = random_perturbation * perturbation_intensity
 
-
     # Apply momentum if available
     if previous_momentum is not None:
         # Combine random perturbation with previous momentum
@@ -58,7 +57,7 @@ def apply_momentum_perturbation(
                 / combined_perturbation_norm
             )
         else:
-             combined_perturbation = np.zeros_like(field_values) # Avoid NaN if norm is zero
+            combined_perturbation = np.zeros_like(field_values)  # Avoid NaN if norm is zero
 
         new_momentum = combined_perturbation
     else:

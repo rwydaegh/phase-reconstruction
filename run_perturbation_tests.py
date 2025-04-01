@@ -1,36 +1,46 @@
 import os
 import subprocess
+import sys
 
-# Create directory for perturbation results if it doesn't exist
-os.makedirs("perturbation_results", exist_ok=True)
+# Define the perturbation factors to test
+perturbation_factors = [0.001, 0.005, 0.01, 0.02, 0.05]  # Example factors (0.1%, 0.5%, 1%, 2%, 5%)
 
-# Define the perturbation factors
-perturbation_factors = [0.001, 0.005, 0.01]  # 0.1%, 0.5%, 1%
+# Construct the Hydra multirun command
+# We use 'poetry run' to ensure the correct environment
+# '-m' enables multirun
+# 'perturb_points=true' enables perturbation for all runs
+# 'perturbation_factor=' specifies the parameter to sweep, followed by the comma-separated values
+command = [
+    "poetry",
+    "run",
+    "python",
+    "simulated_data_reconstruction.py",
+    "-m",
+    "perturb_points=true",
+    f"perturbation_factor={','.join(map(str, perturbation_factors))}",
+    # Optional: Customize Hydra output directory if needed
+    # "hydra.sweep.dir=outputs/perturbation_sweep/${now:%Y-%m-%d_%H-%M-%S}"
+]
 
-for factor in perturbation_factors:
-    print(f"\n==== Running simulation with perturbation_factor={factor} ====\n")
+print("=" * 50)
+print("Running Perturbation Sweep using Hydra Multirun")
+print(f"Factors: {perturbation_factors}")
+print(f"Command: {' '.join(command)}")
+print("=" * 50)
 
-    # Create command with the custom config
-    cmd = [
-        "python",
-        "main.py",
-        "--perturb_points",
-        "True",
-        "--perturbation_factor",
-        str(factor),
-        "--output_file",
-        f"perturbation_results/results_{factor*100:.1f}percent.png",
-    ]
-
-    # Run the command
-    process = subprocess.run(cmd)
-
-    # Note: Animation files (e.g., current_field_animation.gif) are now saved
-    # directly within the Hydra output directory of the 'main.py' run.
-    # The following code attempting to move it from the root directory is removed.
-    # animation_name = f"current_field_animation_{factor*100:.1f}percent.gif"
-    # if os.path.exists("current_field_animation.gif"):
-    #     os.replace("current_field_animation.gif", f"perturbation_results/{animation_name}")
-    print(f"✓ Completed simulation with perturbation_factor={factor}")
-
-print("\nAll simulations completed.")
+# Execute the command
+try:
+    # Use check=True to raise an error if the command fails
+    process = subprocess.run(command, check=True, text=True, stdout=sys.stdout, stderr=sys.stderr)
+    print("\n" + "=" * 50)
+    print("Perturbation sweep completed successfully.")
+    print("Outputs are located in the 'multirun/' directory (or custom Hydra output path).")
+    print("=" * 50)
+except subprocess.CalledProcessError as e:
+    print("\n" + "=" * 50)
+    print(f"Error during perturbation sweep: {e}")
+    print("=" * 50)
+except FileNotFoundError:
+    print("\n" + "=" * 50)
+    print("Error: 'poetry' command not found. Make sure Poetry is installed and in your PATH.")
+    print("=" * 50)

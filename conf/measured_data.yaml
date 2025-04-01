@@ -7,11 +7,12 @@ wavelength: 10.7e-3  # 28GHz wavelength in meters
 plane_size: 1.0      # 1m x 1m measurement plane
 resolution: 149      # Grid resolution (originally 50x50, but real data uses 149)
 room_size: 2.0       # 2m x 2m x 2m room
+use_vector_model: True # Switch between scalar (False) and vector (True) field model
 
 measurement_direction: [0.0, 1.0, 0.0] # Direction vector of the measured E-field component
 # Point cloud parameters
 use_source_pointcloud: True   # Whether to use the source pointcloud file
-source_pointcloud_path: "measurement_data/source_pointcloud.pkl" # Path to the source pointcloud file
+source_pointcloud_path: "measurement_data/intersection_data.pkl" # Path to the source pointcloud file (Corrected path)
 pointcloud_downsample: 4      # Downsample factor for point cloud (1 = no downsampling)
 max_distance_from_origin: -1 # Maximum distance from origin (in meters) to keep points
 wall_points: 10               # Points per wall edge (used if not using source pointcloud)
@@ -39,6 +40,7 @@ temperature: 5.0              # For archived complex strategies
 # Execution control
 verbose: False                # Enable verbose output
 return_history: True          # Return the history of cluster coefficients and fields
+random_seed: 42             # Seed for random number generators
 
 # Visualization parameters
 show_plot: True               # Show plots interactively

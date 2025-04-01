@@ -6,6 +6,13 @@ import hydra
 import numpy as np
 from omegaconf import DictConfig, OmegaConf
 
+from .improved_sensitivity_visualization import enhance_sensitivity_visualization
+from .sensitivity_analysis import (
+    ParameterRange,
+    SensitivityAnalysisConfig,
+    run_sensitivity_analysis,
+)
+
 # Add parent directory to path to find modules from root
 # Ensure the root directory is in the path for src imports
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -13,21 +20,14 @@ if project_root not in sys.path:
     sys.path.append(project_root)
 
 # Import from sensitivity_analysis module within the same package
-from .sensitivity_analysis import (
-    ParameterRange,
-    SensitivityAnalysisConfig,
-    run_sensitivity_analysis,
-)
 # Import the enhanced visualization function
-from .improved_sensitivity_visualization import enhance_sensitivity_visualization
+# Imports moved to top
 
 # Configure logging
 logging.basicConfig(
     level=logging.ERROR, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
-
-
 
 
 @hydra.main(config_path="../conf", config_name="sensitivity_analysis", version_base=None)
@@ -65,7 +65,14 @@ def main(cfg: DictConfig) -> None:
     cfg_dict = OmegaConf.to_container(cfg, resolve=True)
 
     # Keys specific to sensitivity analysis run configuration
-    sensitivity_keys = {"output_dir", "parallel", "max_workers", "parameter_ranges", "hydra", "defaults"}
+    sensitivity_keys = {
+        "output_dir",
+        "parallel",
+        "max_workers",
+        "parameter_ranges",
+        "hydra",
+        "defaults",
+    }
 
     # Create the base_config dictionary
     base_config_dict = {
@@ -76,11 +83,10 @@ def main(cfg: DictConfig) -> None:
     # Assuming sensitivity_analysis.py now expects DictConfig based on previous edits.
     base_config_hydra = OmegaConf.create(base_config_dict)
 
-
     analysis_config = SensitivityAnalysisConfig(
-        base_config=base_config_hydra, # Pass the filtered base config
+        base_config=base_config_hydra,  # Pass the filtered base config
         parameter_ranges=param_ranges_inst,
-        output_dir=output_dir, # Use Hydra's runtime output directory
+        output_dir=output_dir,  # Use Hydra's runtime output directory
         parallel=cfg.parallel,
         max_workers=cfg.max_workers,
     )
@@ -98,8 +104,3 @@ def main(cfg: DictConfig) -> None:
 
 if __name__ == "__main__":
     main()
-
-
-
-
-

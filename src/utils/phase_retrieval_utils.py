@@ -95,7 +95,7 @@ def apply_magnitude_constraint(
 
     # Handle division by zero or near-zero magnitudes
     # Create masks for zero and near-zero simulated magnitudes
-    zero_mask = np.abs(simulated_field) < 1e-15 # Mask for exact zeros
+    zero_mask = np.abs(simulated_field) < 1e-15  # Mask for exact zeros
     # Mask for near-zeros
     near_zero_mask = (np.abs(simulated_field) >= 1e-15) & (simulated_magnitude < 1e-10)
 
@@ -104,7 +104,7 @@ def apply_magnitude_constraint(
 
     # Case 1: Simulated field is exactly zero - assign measured magnitude with zero phase
     if np.any(zero_mask):
-        field_values[zero_mask] = measured_magnitude[zero_mask] # Assign magnitude, phase is 0
+        field_values[zero_mask] = measured_magnitude[zero_mask]  # Assign magnitude, phase is 0
 
     # Case 2: Simulated field is near-zero (but not exactly zero)
     # Use small value for stable division
@@ -338,9 +338,7 @@ def perform_intelligent_restart(
 
     if verbose:
         restart_type = "memory-based ensemble" if memory_solutions else "random initialization"
-        logger.info(
-            f"Performing intelligent restart with {restart_type}"
-        )
+        logger.info(f"Performing intelligent restart with {restart_type}")
 
     return field_values
 
@@ -350,7 +348,7 @@ def create_convergence_plot(
     perturbation_iterations,
     restart_iterations,
     convergence_threshold,
-    output_dir: str, # Add output directory argument
+    output_dir: str,  # Add output directory argument
 ):
     """Create and save a plot showing the error evolution and perturbation points.
 
@@ -363,7 +361,7 @@ def create_convergence_plot(
     """
     try:
         # Create output directory if it doesn't exist
-        os.makedirs(output_dir, exist_ok=True) # Use the provided output directory
+        os.makedirs(output_dir, exist_ok=True)  # Use the provided output directory
 
         # Calculate rate of change (first derivative of error)
         # Compute differences between consecutive errors, padded with 0 at the beginning
@@ -430,7 +428,9 @@ def create_convergence_plot(
         fig.legend(legend_elements, legend_labels, loc="upper right", bbox_to_anchor=(0.95, 0.95))
 
         plt.tight_layout()
-        plt.savefig(os.path.join(output_dir, "gs_convergence.png"), dpi=300) # Save to output directory
+        plt.savefig(
+            os.path.join(output_dir, "gs_convergence.png"), dpi=300
+        )  # Save to output directory
 
         plt.close()
 

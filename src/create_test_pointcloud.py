@@ -58,21 +58,7 @@ def create_test_pointcloud(config: DictConfig) -> np.ndarray:
     # The function should return all points generated on the faces.
     # Filtering for single-face points is now handled correctly in get_cube_normals.
 
-    if config.perturb_points:
-        distances = np.sqrt(np.sum(points**2, axis=1))
-
-        random_perturbations = np.random.uniform(-1, 1, size=points.shape)
-
-        # Scale perturbations by the perturbation factor and distance to origin
-        scaled_perturbations = random_perturbations * config.perturbation_factor
-
-        scaled_perturbations = scaled_perturbations * distances[:, np.newaxis]
-
-        perturbed_points = points + scaled_perturbations
-
-        points = perturbed_points
-
-        if config.verbose:
-            print(f"Applied random perturbations with factor {config.perturbation_factor}")
-
+    # Perturbation logic removed as requested.
+    # This function now only creates the base point cloud.
+    # Perturbation, if needed, is handled in the main simulation script.
     return points

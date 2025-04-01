@@ -24,7 +24,7 @@ This document compares the performance before and after implementing optimizatio
 
 2. **Improved Matrix Operations**
    - Implemented Fortran-order arrays for better memory layout
-   - Added optimized division by zero handling 
+   - Added optimized division by zero handling
    - Precomputed normalization factor for error calculations
    - Streamlined core algorithm to remove overhead
 
