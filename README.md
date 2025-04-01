@@ -39,22 +39,29 @@ This project implements advanced electromagnetic field reconstruction techniques
 
 ## Getting Started
 
-### Prerequisites
-
-- Python 3.8+
-- NumPy
-- Matplotlib
-- Pickle (for saving/loading data)
-
 ### Installation
 
-Clone the repository:
+This project uses [Poetry](https://python-poetry.org/) for dependency management and requires Python 3.8+.
 
-```bash
-git clone https://github.ugent.be/rwydaegh/phase-reconstruction.git
-cd phase-reconstruction
-```
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.ugent.be/rwydaegh/phase-reconstruction.git
+    cd phase-reconstruction
+    ```
 
+2.  **Install Poetry:**
+    Follow the official instructions to install Poetry for your operating system: [https://python-poetry.org/docs/#installation](https://python-poetry.org/docs/#installation)
+    Alternatively, you might be able to install it via pip (ensure pip is configured for your desired Python version):
+    ```bash
+    pip install poetry
+    ```
+
+3.  **Install dependencies:**
+    Once Poetry is installed, navigate to the cloned project directory and run:
+    ```bash
+    poetry install --no-root
+    ```
+    This command will create a virtual environment (if one doesn't exist) and install all the necessary dependencies defined in `pyproject.toml`. The `--no-root` flag is used because the project itself is not structured as a standard installable package.
 ### Usage
 
 Run the main script with default parameters:

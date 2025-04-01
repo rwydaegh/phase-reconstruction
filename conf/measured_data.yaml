@@ -8,6 +8,7 @@ plane_size: 1.0      # 1m x 1m measurement plane
 resolution: 149      # Grid resolution (originally 50x50, but real data uses 149)
 room_size: 2.0       # 2m x 2m x 2m room
 
+measurement_direction: [0.0, 1.0, 0.0] # Direction vector of the measured E-field component
 # Point cloud parameters
 use_source_pointcloud: True   # Whether to use the source pointcloud file
 source_pointcloud_path: "measurement_data/source_pointcloud.pkl" # Path to the source pointcloud file

@@ -164,13 +164,98 @@ def main(cfg: DictConfig) -> None:
         else:
             raise ValueError(f"Source point cloud data has unexpected type: {type(data)}")
 
+        # Expecting preprocessed format: x,y,z, dist, nx,ny,nz, t1x,t1y,t1z, t2x,t2y,t2z (13 cols)
+        if full_points.shape[1] == 13:
+            # Extract tangents after downsampling and translation
+            tangents1_full = full_points[:, 7:10]
+            tangents2_full = full_points[:, 10:13]
+            # Filter tangents based on distance filtering applied to points
+            if hasattr(cfg, "max_distance_from_origin") and cfg.max_distance_from_origin != -1:
+                 tangents1 = tangents1_full[distances <= cfg.max_distance_from_origin]
+                 tangents2 = tangents2_full[distances <= cfg.max_distance_from_origin]
+            else:
+                 tangents1 = tangents1_full
+                 tangents2 = tangents2_full
+
+            logger.info(f"Loaded preprocessed point cloud with {len(points)} points.")
+            logger.info(f"  Points shape: {points.shape}")
+            logger.info(f"  Tangents1 shape: {tangents1.shape}")
+            logger.info(f"  Tangents2 shape: {tangents2.shape}")
+
+        elif full_points.shape[1] == 7:
+            logger.warning(f"Loaded point cloud from {cfg.source_pointcloud_path} has only 7 columns. Calculating tangents and overwriting the file...")
+            # Calculate tangents based on the full (downsampled) point cloud normals
+            normals_full = full_points[:, 4:7] # Assuming columns 4, 5, 6 are nx, ny, nz
+            from src.utils.preprocess_pointcloud import get_tangent_vectors
+            tangents1_full, tangents2_full = get_tangent_vectors(normals_full)
+            logger.info(f"Calculated tangents for full point cloud. t1: {tangents1_full.shape}, t2: {tangents2_full.shape}")
+
+            # Combine original full data with full tangents
+            output_data_full = np.hstack((full_points, tangents1_full, tangents2_full))
+
+            # Overwrite the original file with the full preprocessed data
+            logger.info(f"Overwriting {cfg.source_pointcloud_path} with preprocessed data (13 columns)...")
+            try:
+                # Need to reload the original *un-downsampled* data to save it correctly if downsampling happened
+                # Or, more simply, save the *downsampled* 13-column data back. Let's do the latter.
+                with open(cfg.source_pointcloud_path, "wb") as f_out:
+                     # Save the downsampled but now 13-column data
+                     pickle.dump(output_data_full, f_out)
+                logger.info(f"Successfully overwrote {cfg.source_pointcloud_path} with downsampled, 13-column data.")
+            except Exception as e:
+                logger.error(f"Failed to overwrite {cfg.source_pointcloud_path}: {e}")
+                # Continue with calculated tangents, but log the error
+
+            # Now filter the calculated tangents based on distance, same as points were filtered
+            if hasattr(cfg, "max_distance_from_origin") and cfg.max_distance_from_origin != -1:
+                 tangents1 = tangents1_full[distances <= cfg.max_distance_from_origin]
+                 tangents2 = tangents2_full[distances <= cfg.max_distance_from_origin]
+            else:
+                 tangents1 = tangents1_full
+                 tangents2 = tangents2_full
+            logger.info(f"Filtered tangents. t1: {tangents1.shape}, t2: {tangents2.shape}")
+        else:
+             raise ValueError(f"Loaded point cloud data has unexpected shape: {full_points.shape}. Expected 7 or 13 columns.")
+
         logger.info(f"Using real data point cloud with {len(points)} points, shape: {points.shape}")
     else:
         logger.info("Finished point cloud processing.")
         points = create_test_pointcloud(cfg)
+        # Calculate tangents for the test point cloud (assuming default normals)
+        logger.info("Calculating tangents for generated point cloud (assuming default normals [0, 0, 1]).")
+        temp_normals = np.zeros_like(points)
+        temp_normals[:, 2] = 1.0
+        # Need the tangent calculation function from its new location
+        from src.utils.preprocess_pointcloud import get_tangent_vectors
+        tangents1, tangents2 = get_tangent_vectors(temp_normals)
         logger.info(
             f"Created cube environment with {len(points)} points, cube size: {cfg.room_size}m"
         )
+        logger.info(f"Generated points shape: {points.shape}")
+        logger.info(f"Generated tangents1 shape: {tangents1.shape}")
+        logger.info(f"Generated tangents2 shape: {tangents2.shape}")
+
+    logger.info(f"Final points shape: {points.shape}")
+    # logger.info(f"Final normals shape: {normals.shape}") # No longer primary input
+
+    # Get measurement direction from config
+    try:
+        # Assuming cfg.measurement_direction = [x, y, z]
+        measurement_direction = np.array(cfg.measurement_direction, dtype=float)
+        if measurement_direction.shape != (3,):
+            raise ValueError("measurement_direction must be a list/array of 3 numbers.")
+        # Normalize
+        norm_meas = np.linalg.norm(measurement_direction)
+        if norm_meas < 1e-9:
+            raise ValueError("measurement_direction cannot be a zero vector.")
+        measurement_direction /= norm_meas
+        logger.info(f"Using measurement direction: {measurement_direction}")
+    except KeyError:
+        logger.error("Config missing 'measurement_direction'. Using default [0, 1, 0].")
+        measurement_direction = np.array([0.0, 1.0, 0.0])
+    except Exception as e:
+         logger.error(f"Error processing measurement_direction: {e}. Using default [0, 1, 0].")
+         measurement_direction = np.array([0.0, 1.0, 0.0])
 
     # Load and preprocess real measurement data
     measurement_file = "measurement_data/x400_zy.pickle"
@@ -200,7 +285,7 @@ def main(cfg: DictConfig) -> None:
         logger.info(f"Using config wave number k: {k:.2f}, wavelength: {cfg.wavelength:.4f} m")
 
     logger.info("Creating channel matrix...")
-    H = create_channel_matrix(points, measurement_plane, k)
+    H = create_channel_matrix(points, tangents1, tangents2, measurement_plane, measurement_direction, k)
 
     initial_field_values = None
     if hasattr(cfg, "uniform_current_init") and cfg.uniform_current_init:
@@ -208,9 +293,15 @@ def main(cfg: DictConfig) -> None:
             f"Initializing currents with uniform amplitude {cfg.initial_current_amplitude} "
             f"and random phase"
         )
-        n_points = points.shape[0]
-        random_phases = np.random.uniform(0, 2 * np.pi, n_points)
-        initial_currents = cfg.initial_current_amplitude * np.exp(1j * random_phases)
+        N_c = points.shape[0]
+        # Initialize currents for 2 components per point
+        initial_currents = np.zeros(2 * N_c, dtype=complex)
+        # Apply amplitude and phase to the first component of each point
+        random_phases = np.random.uniform(0, 2 * np.pi, N_c)
+        initial_currents[0::2] = cfg.initial_current_amplitude * np.exp(1j * random_phases)
+        # initial_currents[1::2] = 0 # Already zero
+
+        # Calculate initial field using H (N_m x 2N_c) and initial_currents (2N_c,)
         initial_field = H @ initial_currents
 
         from src.utils.phase_retrieval_utils import apply_magnitude_constraint
@@ -225,10 +316,10 @@ def main(cfg: DictConfig) -> None:
     logger.info("Starting holographic phase retrieval...")
     hpr_result = holographic_phase_retrieval(
         cfg,
-        H,
-        measured_magnitude,
-        initial_field_values=initial_field_values,
-    )
+        H, # Shape (N_m, 2*N_c)
+        measured_magnitude, # Shape (N_m,)
+        initial_field_values=initial_field_values, # Shape (N_m,)
+    ) # Expects cluster_coefficients of shape (2*N_c,) as output
     logger.info("Finished holographic phase retrieval.")
 
     if cfg.return_history:
@@ -264,7 +355,8 @@ def main(cfg: DictConfig) -> None:
         visualize_iteration_history,
     )
 
-    reconstructed_field = reconstruct_field(H, cluster_coefficients)
+    # H is (N_m, 2*N_c), cluster_coefficients is (2*N_c,)
+    reconstructed_field = reconstruct_field(H, cluster_coefficients) # Shape (N_m,)
 
     resolution_y = len(sampled_data["points_discrete"])
     resolution_z = len(sampled_data["points_continuous"])
@@ -350,7 +442,7 @@ def main(cfg: DictConfig) -> None:
 
         visualize_fields(
             points,                   # points
-            cluster_coefficients,     # currents
+            cluster_coefficients,     # currents (shape 2*N_c), visualize_fields might need update
             measurement_plane,        # measurement_plane
             true_field_2d,            # true_field_2d
             measured_magnitude_2d,    # measured_magnitude_2d
@@ -374,7 +466,7 @@ def main(cfg: DictConfig) -> None:
             visualize_iteration_history(
                 points,
                 H,
-                coefficient_history,
+                coefficient_history, # Shape (iterations, 2*N_c), visualize_iteration_history might need update
                 field_history,
                 resolution_param,
                 measurement_plane,        # Added measurement_plane
@@ -390,7 +482,7 @@ def main(cfg: DictConfig) -> None:
             logger.info("Creating enhanced 4-panel animation...")
             visualize_current_and_field_history(
                 points,
-                coefficient_history,
+                coefficient_history, # Shape (iterations, 2*N_c), visualize_current_and_field_history might need update
                 field_history,
                 true_field,
                 resolution_param,

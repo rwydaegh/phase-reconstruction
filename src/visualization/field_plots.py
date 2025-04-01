@@ -84,25 +84,35 @@ def visualize_fields(
     ax2 = fig.add_subplot(2, 2, 3)  # Bottom left
     ax3 = fig.add_subplot(2, 2, 4)  # Bottom right
     # Color points by current magnitude with improved visualization
-    current_mags = np.abs(currents)
-    if np.max(current_mags) > 0:
-        # More extreme scaling - almost invisible for zero values, larger for high values
-        normalized_mags = current_mags / np.max(current_mags)
-
-        # Make sizes very small (near zero) for zero current, larger for higher currents
-        sizes = 0.5 + 150 * normalized_mags**2  # Square for more dramatic effect
-
-        # Make colors more transparent for low values
-        alphas = 0.2 + 0.8 * normalized_mags  # Range from 0.2 to 1.0 transparency
+    # Calculate combined magnitude per point from the two components in 'currents'
+    if currents.shape[0] == 2 * points.shape[0]:
+        coeffs_t1 = currents[0::2]      # Shape (N_c,)
+        coeffs_t2 = currents[1::2]      # Shape (N_c,)
+        current_mags_per_point = np.sqrt(np.abs(coeffs_t1)**2 + np.abs(coeffs_t2)**2) # Shape (N_c,)
+    elif currents.shape[0] == points.shape[0]:
+         # Handle case where scalar currents might still be passed (e.g., from older data)
+         logger.warning("visualize_fields received currents with shape matching points, assuming scalar values.")
+         current_mags_per_point = np.abs(currents)
     else:
-        sizes = 0.5  # Near-zero size for all points if all currents are zero
-        alphas = 0.2  # Low alpha for all points if all currents are zero
+         raise ValueError(f"Shape mismatch: currents shape {currents.shape} not compatible with points shape {points.shape}")
+
+    if current_mags_per_point.shape[0] != points.shape[0]:
+         raise ValueError(f"Mismatch between points ({points.shape[0]}) and calculated current magnitudes ({current_mags_per_point.shape[0]})")
+
+    max_mag = np.max(current_mags_per_point)
+    if max_mag > 1e-9: # Use a small tolerance
+        normalized_mags = current_mags_per_point / max_mag
+        sizes = 0.5 + 150 * normalized_mags**2
+        alphas = 0.2 + 0.8 * normalized_mags
+    else:
+        sizes = 0.5
+        alphas = 0.2
 
     scatter = ax3d.scatter(
         points[:, 0],
         points[:, 1],
         points[:, 2],
-        c=current_mags,
+        c=current_mags_per_point, # Use combined magnitude for color
         s=sizes,
         cmap="plasma",
         alpha=alphas,

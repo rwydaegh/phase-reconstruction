@@ -1,90 +1,111 @@
-from functools import lru_cache
-
 import numpy as np
-from scipy.spatial.distance import cdist
+from functools import lru_cache
+# from scipy.spatial.distance import cdist # No longer needed here
 
-
-def create_channel_matrix(
-    points: np.ndarray, measurement_plane: np.ndarray, k: float
-) -> np.ndarray:
-    """Create channel matrix H relating source points to measurement points for scalar fields.
-
-    Args:
-        points: Source points (clusters), shape (num_points, 3)
-        measurement_plane: Measurement positions, shape (resolution, resolution, 3)
-        k: Wave number
-
-    Returns:
-        Channel matrix H with shape (num_measurements, num_points)
-    """
-    # Flatten measurement plane points for matrix operations
-    measurement_points = measurement_plane.reshape(-1, 3)
-
-    # Use scipy's cdist for fast distance calculations
-    distances = cdist(measurement_points, points)
-
-    # Avoid division by zero
-    distances = np.maximum(distances, 1e-10)
-
-    # Calculate exp(-jkR)/(4πR) directly
-    H = np.exp(-1j * k * distances) / (4 * np.pi * distances)
-
-    # Use fortran array layout for more efficient matrix multiplication
-    H = np.asfortranarray(H)
-
-    return H
+# Import the updated vectorized function
+from src.create_channel_matrix import create_channel_matrix
+# Removed the old scalar create_channel_matrix definition from this file.
+# The vectorized version is now imported from src.create_channel_matrix
 
 
 @lru_cache(maxsize=8)
 def _create_channel_matrix_cached(
-    points_tuple, measurement_plane_shape, measurement_plane_bytes, k
+    points_tuple: tuple,
+    tangents1_tuple: tuple,
+    tangents2_tuple: tuple,
+    measurement_plane_shape: tuple,
+    measurement_plane_bytes: bytes,
+    measurement_direction_tuple: tuple,
+    k: float,
 ):
-    """Cached version of channel matrix creation for repeated configurations."""
-    # Convert back to numpy arrays
+    """Cached version of the vectorized channel matrix creation."""
+    # Convert hashable types back to numpy arrays
     points = np.array(points_tuple)
-    measurement_plane = np.frombuffer(measurement_plane_bytes).reshape(measurement_plane_shape)
+    tangents1 = np.array(tangents1_tuple)
+    tangents2 = np.array(tangents2_tuple)
+    measurement_plane = np.frombuffer(measurement_plane_bytes, dtype=np.float64).reshape(
+        measurement_plane_shape
+    )
+    measurement_direction = np.array(measurement_direction_tuple)
 
-    return create_channel_matrix(points, measurement_plane, k)
+    # Call the imported vectorized function
+    return create_channel_matrix(
+        points, tangents1, tangents2, measurement_plane, measurement_direction, k
+    )
 
 
 def compute_fields(
     points: np.ndarray,
-    currents: np.ndarray,
+    tangents1: np.ndarray,
+    tangents2: np.ndarray,
+    currents: np.ndarray, # Should now be shape (2 * num_points,)
     measurement_plane: np.ndarray,
+    measurement_direction: np.ndarray,
     k: float,
-    channel_matrix: np.ndarray = None,
+    channel_matrix: np.ndarray = None, # Will be shape (N_m, 2 * num_points)
 ) -> np.ndarray:
-    """Compute fields from currents using the channel matrix.
+    """Compute measured E-field component from source current coefficients.
+
+    Uses the vectorized channel matrix H.
 
     Args:
-        points: Source points, shape (num_points, 3)
-        currents: Current amplitudes at source points, shape (num_points,)
-        measurement_plane: Measurement positions, shape (resolution, resolution, 3)
-        k: Wave number
-        channel_matrix: Optional pre-computed channel matrix. If None, it will be computed.
+        points: Source points (clusters), shape (N_c, 3).
+        tangents1: First set of unit tangent vectors at each source point, shape (N_c, 3).
+        tangents2: Second set of unit tangent vectors (orthogonal to tangents1 and normal),
+                   shape (N_c, 3).
+        currents: Complex current coefficients, shape (2 * N_c,).
+                  Order: [x_1_t1, x_1_t2, x_2_t1, x_2_t2, ...].
+        measurement_plane: Measurement positions, shape (res, res, 3) or (N_m, 3).
+        measurement_direction: Unit vector of the measured E-field component, shape (3,).
+        k: Wave number (2 * pi / lambda).
+        channel_matrix: Optional pre-computed channel matrix, shape (N_m, 2 * N_c).
+                        If None, it will be computed.
 
     Returns:
-        Field values at measurement points
+        Complex field values (measured component) at measurement points, shape (N_m,).
     """
     # Use provided channel matrix or compute it with optional caching
     if channel_matrix is None:
         try:
-            # Try to use cached version for repeated configurations
+            # Prepare hashable arguments for caching
             points_tuple = tuple(map(tuple, points))
+            # Convert tangents to tuples for hashing
+            tangents1_tuple = tuple(map(tuple, tangents1))
+            tangents2_tuple = tuple(map(tuple, tangents2))
             measurement_plane_shape = measurement_plane.shape
-            measurement_plane_bytes = measurement_plane.tobytes()
+            # Ensure consistent dtype for bytes conversion
+            measurement_plane_bytes = measurement_plane.astype(np.float64, copy=False).tobytes()
+            # Convert measurement_direction to tuple for hashing
+            measurement_direction_tuple = tuple(measurement_direction)
+
             H = _create_channel_matrix_cached(
-                points_tuple, measurement_plane_shape, measurement_plane_bytes, k
+                points_tuple,
+                tangents1_tuple,
+                tangents2_tuple,
+                measurement_plane_shape,
+                measurement_plane_bytes,
+                measurement_direction_tuple,
+                k,
             )
-        except Exception:
+        except Exception as e:
+            print(f"Cache lookup/creation failed: {e}. Falling back to direct computation.")
             # Fall back to direct computation if caching fails
-            H = create_channel_matrix(points, measurement_plane, k)
+            H = create_channel_matrix(
+                points, tangents1, tangents2, measurement_plane, measurement_direction, k
+            )
     else:
         H = channel_matrix
 
     # Calculate fields using matrix multiplication
-    # Ensure fortran array layout for more efficient matrix multiplication
+    # Ensure currents vector has the correct shape (2 * N_c)
+    if currents.shape != (2 * points.shape[0],):
+         raise ValueError(f"Currents shape {currents.shape} is incompatible with H shape {H.shape}. Expected ({2 * points.shape[0]},)")
+
+    # Ensure fortran array layout for efficiency
     currents_fortran = np.asfortranarray(currents)
+    # H is already Fortran contiguous from create_channel_matrix
+
+    # Calculate fields: y = H * x
     return H @ currents_fortran
 
 
@@ -92,11 +113,12 @@ def reconstruct_field(channel_matrix: np.ndarray, cluster_coefficients: np.ndarr
     """Reconstruct field from cluster coefficients.
 
     Args:
-        channel_matrix: Matrix H relating clusters to measurement points
-        cluster_coefficients: Coefficients of clusters
+        channel_matrix: Matrix H relating clusters to measurement points, shape (N_m, 2*N_c).
+        cluster_coefficients: Coefficients of clusters, shape (2*N_c,).
+                              Order: [x_1_t1, x_1_t2, x_2_t1, x_2_t2, ...].
 
     Returns:
-        Reconstructed complex field
+        Reconstructed complex field component at measurement points, shape (N_m,).
     """
     # Ensure fortran array layout for more efficient matrix multiplication
     coeff_fortran = np.asfortranarray(cluster_coefficients)

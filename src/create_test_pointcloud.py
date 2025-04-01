@@ -54,18 +54,9 @@ def create_test_pointcloud(config: DictConfig) -> np.ndarray:
 
     points = np.vstack(points)
 
-    half_size = config.room_size / 2
-    non_edge_points = (
-        (-half_size < points[:, 0])
-        & (points[:, 0] < half_size)
-        & (-half_size < points[:, 1])
-        & (points[:, 1] < half_size)
-        & (-half_size < points[:, 2])
-        & (points[:, 2] < half_size)
-    )
-    if np.any(non_edge_points):
-        print(f"WARNING: {np.sum(non_edge_points)} interior points found and will be removed")
-        points = points[~non_edge_points]
+    # Removed incorrect filtering logic that removed interior face points.
+    # The function should return all points generated on the faces.
+    # Filtering for single-face points is now handled correctly in get_cube_normals.
 
     if config.perturb_points:
         distances = np.sqrt(np.sum(points**2, axis=1))

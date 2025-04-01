@@ -63,6 +63,12 @@ skip-magic-trailing-comma = false
 # Like Black, automatically detect the appropriate line ending.
 line-ending = "auto"
 
+[tool.poetry]
+packages = [
+    { include = "phase_reconstruction", from = "src" },
+]
+
+
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.5"
 flake8 = "^7.1.0"

@@ -386,25 +386,29 @@ def visualize_current_and_field_history(
     ax4 = fig.add_subplot(2, 2, 4)
 
     # Initial 3D scatter plot of points with current densities (top left)
-    current_mags = np.abs(coefficient_history[0])
-    if np.max(current_mags) > 0:
-        # More extreme scaling - almost invisible for zero values, larger for high values
-        normalized_mags = current_mags / np.max(current_mags)
+    # Calculate combined magnitude per point from the two components
+    coeffs_frame_0 = coefficient_history[0] # Shape (2*N_c,)
+    coeffs_t1_0 = coeffs_frame_0[0::2]      # Shape (N_c,)
+    coeffs_t2_0 = coeffs_frame_0[1::2]      # Shape (N_c,)
+    current_mags_per_point_0 = np.sqrt(np.abs(coeffs_t1_0)**2 + np.abs(coeffs_t2_0)**2) # Shape (N_c,)
 
-        # Make sizes very small (near zero) for zero current, larger for higher currents
-        sizes = 0.5 + 150 * normalized_mags**2  # Square for more dramatic effect
+    if current_mags_per_point_0.shape[0] != points.shape[0]:
+         raise ValueError(f"Mismatch between points ({points.shape[0]}) and calculated current magnitudes ({current_mags_per_point_0.shape[0]})")
 
-        # Make colors more transparent for low values
-        alphas = 0.2 + 0.8 * normalized_mags  # Range from 0.2 to 1.0 transparency
+    max_mag_0 = np.max(current_mags_per_point_0)
+    if max_mag_0 > 1e-9: # Use a small tolerance instead of > 0
+        normalized_mags = current_mags_per_point_0 / max_mag_0
+        sizes = 0.5 + 150 * normalized_mags**2
+        alphas = 0.2 + 0.8 * normalized_mags
     else:
-        sizes = 0.5  # Near-zero size for all points if all currents are zero
-        alphas = 0.2  # Low alpha for all points if all currents are zero
+        sizes = 0.5
+        alphas = 0.2
 
     scatter = ax1.scatter(
         points[:, 0],
         points[:, 1],
         points[:, 2],
-        c=current_mags,
+        c=current_mags_per_point_0, # Use combined magnitude for color
         s=sizes,
         cmap="plasma",
         alpha=alphas,
@@ -527,25 +531,26 @@ def visualize_current_and_field_history(
         ax1.clear()
 
         # Update current density scatter plot
-        current_mags = np.abs(selected_coefficient_history[i])
-        if np.max(current_mags) > 0:
-            # More extreme scaling - almost invisible for zero values, larger for high values
-            normalized_mags = current_mags / np.max(current_mags)
+        # Calculate combined magnitude per point for the current frame
+        coeffs_frame_i = selected_coefficient_history[i] # Shape (2*N_c,)
+        coeffs_t1_i = coeffs_frame_i[0::2]          # Shape (N_c,)
+        coeffs_t2_i = coeffs_frame_i[1::2]          # Shape (N_c,)
+        current_mags_per_point_i = np.sqrt(np.abs(coeffs_t1_i)**2 + np.abs(coeffs_t2_i)**2) # Shape (N_c,)
 
-            # Make sizes very small (near zero) for zero current, larger for higher currents
-            sizes = 0.5 + 150 * normalized_mags**2  # Square for more dramatic effect
-
-            # Make colors more transparent for low values
-            alphas = 0.2 + 0.8 * normalized_mags  # Range from 0.2 to 1.0 transparency
+        max_mag_i = np.max(current_mags_per_point_i)
+        if max_mag_i > 1e-9: # Use a small tolerance
+            normalized_mags = current_mags_per_point_i / max_mag_i
+            sizes = 0.5 + 150 * normalized_mags**2
+            alphas = 0.2 + 0.8 * normalized_mags
         else:
-            sizes = 0.5  # Near-zero size for all points if all currents are zero
-            alphas = 0.2  # Low alpha for all points if all currents are zero
+            sizes = 0.5
+            alphas = 0.2
 
         scatter = ax1.scatter(
             points[:, 0],
             points[:, 1],
             points[:, 2],
-            c=current_mags,
+            c=current_mags_per_point_i, # Use combined magnitude for color
             s=sizes,
             cmap="plasma",
             alpha=alphas,
