@@ -1,4 +1,7 @@
-import argparse
+import hydra
+from omegaconf import DictConfig, OmegaConf
+
+# import argparse # Replaced by Hydra
 import logging
 import os
 import sys
@@ -10,7 +13,7 @@ from matplotlib.colors import LogNorm, Normalize
 
 # Add parent directory to path to find modules from root
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src.simulation_config_real_data import SimulationConfig
+# from src.simulation_config_real_data import SimulationConfig # Replaced by Hydra config
 
 # Import directly from sensitivity_analysis.py file in the same directory
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -27,116 +30,50 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def parse_args():
-    """Parse command line arguments"""
-    parser = argparse.ArgumentParser(
-        description="Run sensitivity analysis for field reconstruction"
-    )
-
-    # Add parameters for sensitivity analysis
-    parser.add_argument(
-        "--output-dir", type=str, default="sensitivity_results", help="Output directory for results"
-    )
-    parser.add_argument("--parallel", action="store_true", help="Run simulations in parallel")
-    parser.add_argument(
-        "--max-workers", type=int, default=12, help="Maximum number of parallel workers"
-    )
-
-    # Base simulation parameters
-    parser.add_argument(
-        "--resolution",
-        type=int,
-        default=30,
-        help="Resolution of measurement plane grid (default: 30)",
-    )
-    parser.add_argument(
-        "--gs-iterations",
-        type=int,
-        default=200,
-        help="Maximum Gerchberg-Saxton iterations (default: 200)",
-    )
-    parser.add_argument(
-        "--perturb-points", action="store_true", help="Enable point cloud perturbation"
-    )
-    parser.add_argument(
-        "--perturbation-factor",
-        type=float,
-        default=0.01,
-        help="Max perturbation as percentage of distance to origin (default: 0.01)",
-    )
-
-    parser.add_argument(
-        "--verbose", action="store_true", help="Enable verbose logging (debug level)"
-    )
-
-    # Parse arguments
-    return parser.parse_args()
+# Removed parse_args function (handled by Hydra)
 
 
-def main():
-    """Run sensitivity analysis with customizable parameters"""
-    args = parse_args()
+@hydra.main(config_path="../conf", config_name="sensitivity_analysis", version_base=None)
+def main(cfg: DictConfig) -> None:
+    """Run sensitivity analysis using Hydra configuration"""
+    # args = parse_args() # Removed
 
-    # Create output directory
-    os.makedirs(args.output_dir, exist_ok=True)
+    # Log the configuration
+    logger.info("Starting sensitivity analysis with configuration:")
+    logger.info(OmegaConf.to_yaml(cfg))
 
-    # Create base configuration
-    base_config = SimulationConfig(
-        wavelength=10.7e-3,  # 28GHz wavelength in meters
-        plane_size=1.0,  # 1m x 1m measurement plane
-        resolution=args.resolution,
-        room_size=2.0,  # 2m x 2m x 2m room
-        wall_points=6,  # Points per wall edge
-        num_sources=50,  # Number of sources to randomly select
-        gs_iterations=args.gs_iterations,
-        convergence_threshold=1e-3,
-        perturb_points=args.perturb_points,  # Apply perturbation if enabled
-        perturbation_factor=args.perturbation_factor,  # Perturbation scaling factor
-        show_plot=False,  # Disable plotting for batch runs
-        return_history=False,  # Disable history for faster execution
-        verbose=args.verbose,  # Verbose output if requested
-    )
+    # Create output directory (Hydra handles the main output dir, but we might want a subdir)
+    # Using Hydra's output dir: hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
+    # Or simply let run_sensitivity_analysis handle it based on cfg.output_dir
+    output_dir = cfg.output_dir
+    os.makedirs(output_dir, exist_ok=True)
 
-    # Define parameter pairs to analyze
-    # Focusing on the most important parameters for performance analysis
-    parameter_ranges = [
-        # Number of sources (how many active sources on walls)
-        ParameterRange(param_name="num_sources", start=10, end=200, num_steps=10, log_scale=True),
-        # Resolution of measurement plane
-        ParameterRange(param_name="resolution", start=10, end=50, num_steps=8, log_scale=False),
-        # Wall points per edge
-        ParameterRange(param_name="wall_points", start=5, end=20, num_steps=8, log_scale=False),
-    ]
+    # Create base configuration (Now part of the loaded cfg)
+    # base_config = SimulationConfig(...) # Removed
 
-    # Add perturbation factor range if perturbation is enabled
-    if args.perturb_points:
-        parameter_ranges.append(
-            ParameterRange(
-                param_name="perturbation_factor",
-                start=0.001,  # 0.1% perturbation
-                end=0.1,  # 10% perturbation
-                num_steps=8,
-                log_scale=True,
-            )
-        )
+    # Define parameter pairs to analyze (Now loaded from cfg)
+    # parameter_ranges = [...] # Removed
 
-    # Create sensitivity analysis configuration
+    # Create sensitivity analysis configuration object from Hydra config
+    # Need to instantiate ParameterRange objects from the list in cfg
+    param_ranges_inst = [ParameterRange(**p_range) for p_range in cfg.parameter_ranges]
+
     analysis_config = SensitivityAnalysisConfig(
-        base_config=base_config,
-        parameter_ranges=parameter_ranges,
-        output_dir=args.output_dir,
-        parallel=args.parallel,
-        max_workers=args.max_workers,
+        base_config=cfg.base_simulation, # Access the composed base config
+        parameter_ranges=param_ranges_inst,
+        output_dir=output_dir, # Use output_dir from config
+        parallel=cfg.parallel,
+        max_workers=cfg.max_workers,
     )
 
     # Run sensitivity analysis
     logger.info("Starting sensitivity analysis")
     run_sensitivity_analysis(analysis_config)
-    logger.info(f"Sensitivity analysis complete. Results saved to {args.output_dir}")
+    logger.info(f"Sensitivity analysis complete. Results saved to {output_dir}")
 
     # Create visualizations directly in the output directory
-    create_visualizations(args.output_dir, save_dir=args.output_dir)
-    logger.info(f"Visualizations created in '{args.output_dir}' directory")
+    create_visualizations(output_dir, save_dir=output_dir)
+    logger.info(f"Visualizations created in '{output_dir}' directory")
 
 
 def create_rmse_plot(X, Y, rmse, param1_name, param2_name, save_dir):
@@ -384,5 +321,4 @@ def create_visualizations(output_dir="sensitivity_results", save_dir=None):
     logger.info(f"Visualizations saved to {save_dir}")
 
 
-if __name__ == "__main__":
-    main()
+# Removed __main__ block, entry point handled by Hydra decorator

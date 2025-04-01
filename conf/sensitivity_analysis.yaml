@@ -1,0 +1,48 @@
+# conf/sensitivity_analysis.yaml
+
+defaults:
+  - base_simulation: fake_data # Choose default simulation config (fake_data or config)
+  - _self_ # Allows overriding parameters defined here
+
+# Parameters specific to sensitivity analysis execution
+output_dir: "sensitivity_results"
+parallel: True
+max_workers: 4
+
+# Define parameter ranges to analyze
+# Structure: List of dictionaries, each defining a parameter range
+parameter_ranges:
+  - param_name: "wall_points"
+    start: 4
+    end: 12
+    num_steps: 5
+    log_scale: False
+  - param_name: "num_sources"
+    start: 10
+    end: 200
+    num_steps: 5
+    log_scale: True
+  - param_name: "resolution"
+    start: 10
+    end: 60
+    num_steps: 4
+    log_scale: False
+  - param_name: "gs_iterations"
+    start: 50
+    end: 300
+    num_steps: 4
+    log_scale: False
+  - param_name: "convergence_threshold"
+    start: 1e-4
+    end: 1e-2
+    num_steps: 4
+    log_scale: True
+  # Add other parameters like wavelength, room_size etc. if needed for analysis
+
+# Hydra specific config (can be inherited or overridden)
+hydra:
+  run:
+    dir: outputs/sensitivity/${now:%Y-%m-%d_%H-%M-%S}
+  sweep:
+    dir: multirun/sensitivity/${now:%Y-%m-%d_%H-%M-%S}
+    subdir: ${hydra.job.num}
