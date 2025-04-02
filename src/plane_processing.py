@@ -112,8 +112,9 @@ def load_real_plane(plane_cfg: DictConfig, base_dir: str) -> dict | None:
     points_disc_m = sampled_data["points_discrete"] / 1000.0  # Convert mm to m
 
     # Center the coordinates before creating the grid
-    points_cont_centered = points_cont_m - np.mean(points_cont_m)
-    points_disc_centered = points_disc_m - np.mean(points_disc_m)
+    ENABLE_CENTERING = 0
+    points_cont_centered = points_cont_m - np.mean(points_cont_m) * ENABLE_CENTERING
+    points_disc_centered = points_disc_m - np.mean(points_disc_m) * ENABLE_CENTERING
 
     if cont_axis_name == "z" and disc_axis_name == "y":  # YZ plane (X=const)
         # Meshgrid expects (x, y) -> (cols, rows)

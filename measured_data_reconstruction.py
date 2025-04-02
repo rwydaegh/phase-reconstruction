@@ -138,7 +138,7 @@ def main(cfg: DictConfig) -> None:
 
         if isinstance(data, np.ndarray):
             if data.shape[1] >= 3:
-                translation = np.array([-5.35211, -6.34833, -1.28819])
+                translation = np.array([0.0, 0.0, 0.0])
                 points = data[:, :3] + translation  # Adding negative values = subtraction
                 logger.info(f"Translated point cloud by {translation} meters")
 

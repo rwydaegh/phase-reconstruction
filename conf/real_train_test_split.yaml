@@ -1,0 +1,87 @@
+# conf/real_train_test_split.yaml
+# Train on 4 real measurement planes, test on 1 real measurement plane.
+
+defaults:
+  - _self_
+
+# Top-level control
+legacy_mode: false
+
+# Global parameters
+global_params:
+  wavelength: 0.0107068735 # Corresponds to 28 GHz (c / 28e9)
+  use_vector_model: false # Measurement data is scalar magnitude
+  measurement_direction: [1.0, 0.0, 0.0] # Placeholder for scalar
+  random_seed: 42
+  gs_iterations: 200 # Adjust as needed
+  convergence_threshold: 1e-4 # Adjust as needed
+  regularization: 1e-5 # Adjust as needed
+  adaptive_regularization: true
+  return_history: true # Needed for some plots/analysis
+  verbose: true
+  perturbation_mode: "none"
+  enable_perturbations: false
+  show_plot: false
+  no_plot: false # Enable plots for analysis
+  no_anim: false # Enable animations
+
+# Source Point Cloud Configuration (Using the provided intersection data)
+source_pointcloud:
+  use_source_file: true
+  source_file_path: "measurement_data/intersection_data.pkl" # Corrected parameter name
+  pointcloud_downsample: 8 # Downsample source points by factor of 8
+  perturb_points: false # Use the exact points from the file
+
+# List of Measurement Planes
+measurement_planes:
+  # --- Training Planes ---
+  - name: "real_x0_zy"
+    is_real_plane: true
+    use_train: true
+    use_test: false
+    measured_data_path: "measurement_data/x0_zy.pickle"
+    target_resolution: 32 # Further reduced resolution
+    translation: [0.0, 0.0, 0.0] # Coordinates are already relative to origin
+
+  - name: "real_x400_zy"
+    is_real_plane: true
+    use_train: true
+    use_test: false
+    measured_data_path: "measurement_data/x400_zy.pickle"
+    target_resolution: 32 # Further reduced resolution
+    translation: [0.4, 0.0, 0.0] # Translate plane to x=400mm
+
+  - name: "real_y0_zx"
+    is_real_plane: true
+    use_train: true
+    use_test: false
+    measured_data_path: "measurement_data/y0_zx.pickle"
+    target_resolution: 32 # Further reduced resolution
+    translation: [0.0, 0.2, 0.0] # Translate plane to y=200mm
+
+  - name: "real_y200_zx"
+    is_real_plane: true
+    use_train: true
+    use_test: false
+    measured_data_path: "measurement_data/y200_zx.pickle"
+    target_resolution: 32 # Further reduced resolution
+    translation: [0.0, 0.4, 0.0] # Translate plane to y=400mm
+
+  # --- Testing Plane ---
+  - name: "real_y400_zx"
+    is_real_plane: true
+    use_train: false
+    use_test: true
+    measured_data_path: "measurement_data/y400_zx.pickle"
+    target_resolution: 32 # Further reduced resolution
+    translation: [0.0, 0.0, 0.0]
+    visualization: # Optional: Control plotting for this specific plane
+      animate_comparison: true # Generate comparison animation for the test plane
+
+# Hydra specific config for output directories
+hydra:
+  run:
+    dir: outputs/real_train_test_split/${now:%Y-%m-%d_%H-%M-%S}
+  sweep:
+    dir: multirun/real_train_test_split/${now:%Y-%m-%d_%H-%M-%S}
+    subdir: ${hydra.job.num}
