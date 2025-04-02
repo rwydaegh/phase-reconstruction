@@ -3,7 +3,6 @@ import pytest
 from hydra import compose, initialize
 from omegaconf import DictConfig
 
-
 # Removed obsolete test_import function that checked for the old 'main'
 
 
