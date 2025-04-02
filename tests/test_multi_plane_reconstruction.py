@@ -4,12 +4,7 @@ from hydra import compose, initialize
 from omegaconf import DictConfig
 
 
-# Basic test to ensure the script can be imported and the main function exists
-def test_import():
-    try:
-        from multi_plane_reconstruction import main
-    except ImportError as e:
-        pytest.fail(f"Failed to import multi_plane_reconstruction: {e}")
+# Removed obsolete test_import function that checked for the old 'main'
 
 
 # Test if Hydra configuration loads (using the new config)
