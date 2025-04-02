@@ -53,7 +53,6 @@ def load_measurement_data(file_path):
     }
 
 
-
 def sample_measurement_data(data, target_resolution=50):
     """
     Sample measurement data to reduce dimensionality to the target resolution

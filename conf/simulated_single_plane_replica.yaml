@@ -10,8 +10,8 @@ legacy_mode: false
 # Global parameters (based on simulated_data.yaml where applicable)
 global_params:
   wavelength: 10.7e-3
-  use_vector_model: false
-  measurement_direction: [1.0, 0.0, 0.0]
+  use_vector_model: true
+  measurement_direction: [1.0, 0.0, 0.0] # Match legacy script's apparent default
   random_seed: 42
   # GS Algorithm Parameters
   gs_iterations: 200

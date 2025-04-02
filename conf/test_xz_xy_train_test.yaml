@@ -1,0 +1,61 @@
+# conf/test_xz_xy_train_test.yaml
+# Test: Train on simulated XZ plane, Test on simulated XY plane (different location).
+
+defaults:
+  - _self_
+
+legacy_mode: false
+
+global_params:
+  wavelength: 0.01
+  use_vector_model: false
+  random_seed: 4202
+  gs_iterations: 20
+  convergence_threshold: 1e-2
+  regularization: 1e-4
+  adaptive_regularization: false
+  return_history: true # Needed for animations
+  verbose: false
+  perturbation_mode: "none"
+  enable_perturbations: false
+  show_plot: false
+  no_plot: false # Enable static plots
+  no_anim: false # Enable animations
+
+source_pointcloud:
+  use_source_file: false
+  room_size: 1.0
+  wall_points: 5
+  perturb_points: false
+  num_sources: 20
+  amplitude_sigma: 1.0
+
+measurement_planes:
+  # Plane 1: Training Only (Simulated XZ plane at y = -0.3m)
+  - name: "sim_xz_train"
+    is_real_plane: false
+    use_train: true
+    use_test: false
+    translation: [0.0, -0.3, 0.0]
+    plane_type: 'xz'
+    center: [0.0, 0.0, 0.0]
+    size: [0.4, 0.4]
+    resolution: 25
+    # animate_comparison defaults to false
+
+  # Plane 2: Testing Only (Simulated XY plane at z = 0.5m)
+  - name: "sim_xy_test"
+    is_real_plane: false
+    use_train: false
+    use_test: true
+    translation: [0.0, 0.0, 0.5]
+    plane_type: 'xy'
+    center: [0.0, 0.0, 0.0]
+    size: [0.5, 0.5]
+    resolution: 25
+    visualization:
+      animate_comparison: true # Explicitly enable
+
+hydra:
+  run:
+    dir: outputs/tests/test_xz_xy_train_test/${now:%Y-%m-%d_%H-%M-%S}

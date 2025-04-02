@@ -253,22 +253,41 @@ def main(cfg: DictConfig) -> None:
 
     # Pass necessary info to HPR. Assume HPR internally handles scalar/vector based on H shape.
     # Alternatively, HPR might need the flag explicitly. Assuming the former for now.
+    # Create default train_plane_info for the single plane
+    num_measurement_points = H_measured.shape[0]
+    train_plane_info = [("simulated_plane", 0, num_measurement_points)]
+
     hpr_result = holographic_phase_retrieval(
         cfg=cfg,
         channel_matrix=H_measured,  # Use the (potentially perturbed) measured channel matrix
         measured_magnitude=measured_magnitude,  # Magnitude comes from the true field
+        train_plane_info=train_plane_info,  # Added required argument
+        test_planes_data=None,  # Added optional argument
         output_dir=output_dir,
     )
 
     if cfg.return_history:
-        cluster_coefficients, coefficient_history, field_history, stats = hpr_result
+        # Unpack results based on the new return signature (even if full_history is None)
+        cluster_coefficients, full_history, stats = hpr_result
+        # Extract legacy history variables if needed (and if history was returned)
+        coefficient_history = (
+            np.array([h["coefficients"] for h in full_history]) if full_history else None
+        )
+        # Field history is more complex now (segmented/test), maybe skip legacy field animation?
+        # For now, let's try reconstructing the full field history from segments if possible
+        # This assumes 'simulated_plane' was the name used in train_plane_info
+        field_history = (
+            np.array([h["train_field_segments"]["simulated_plane"] for h in full_history])
+            if full_history and "simulated_plane" in full_history[0]["train_field_segments"]
+            else None
+        )
         logger.info(f"Coefficient history shape: {coefficient_history.shape}")
         logger.info(f"Field history shape: {field_history.shape}")
 
         logger.info("Perturbation statistics:")
         logger.info(f"  Total iterations: {stats['iterations']}")
-        logger.info(f"  Final RMSE: {stats['final_rmse']:.6f}")
-        logger.info(f"  Best RMSE: {stats['best_rmse']:.6f}")
+        logger.info(f"  Final Overall RMSE: {stats['final_overall_rmse']:.6f}")  # Use correct key
+        logger.info(f"  Best Overall RMSE: {stats['best_overall_rmse']:.6f}")  # Use correct key
         logger.info(f"  Perturbations applied: {stats['num_perturbations']}")
 
         if stats["post_perturbation_tracking"]:
@@ -296,7 +315,7 @@ def main(cfg: DictConfig) -> None:
                 points_perturbed,  # Visualize based on the geometry used for reconstruction
                 H_measured,  # Use the measured channel matrix
                 coefficient_history,
-                field_history,
+                field_history if field_history is not None else [],  # Pass empty list if None
                 cfg.resolution,
                 measurement_plane,
                 show_plot=(cfg.show_plot and not cfg.no_plot),
@@ -315,7 +334,7 @@ def main(cfg: DictConfig) -> None:
             visualize_current_and_field_history(
                 points_perturbed,  # Visualize currents relative to the perturbed points
                 coefficient_history,  # Coefficients are relative to H_measured basis
-                field_history,
+                field_history if field_history is not None else [],  # Pass empty list if None
                 true_field,  # Pass the synthetic true field for comparison
                 cfg.resolution,
                 measurement_plane,
@@ -330,8 +349,8 @@ def main(cfg: DictConfig) -> None:
 
         logger.info("Perturbation statistics:")
         logger.info(f"  Total iterations: {stats['iterations']}")
-        logger.info(f"  Final RMSE: {stats['final_rmse']:.6f}")
-        logger.info(f"  Best RMSE: {stats['best_rmse']:.6f}")
+        logger.info(f"  Final Overall RMSE: {stats['final_overall_rmse']:.6f}")  # Use correct key
+        logger.info(f"  Best Overall RMSE: {stats['best_overall_rmse']:.6f}")  # Use correct key
         logger.info(f"  Perturbations applied: {stats['num_perturbations']}")
 
     reconstructed_field = reconstruct_field(

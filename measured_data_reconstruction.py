@@ -379,23 +379,43 @@ def main(cfg: DictConfig) -> None:
     # Run holographic phase retrieval
     logger.info("Starting holographic phase retrieval...")
     # Pass necessary info to HPR. Assume HPR handles H shape internally.
+    # Create default train_plane_info for the single plane
+    num_measurement_points = H.shape[0]
+    train_plane_info = [("measured_plane", 0, num_measurement_points)]
+
     hpr_result = holographic_phase_retrieval(
         cfg=cfg,
         channel_matrix=H,
         measured_magnitude=measured_magnitude,
+        train_plane_info=train_plane_info,  # Added required argument
+        test_planes_data=None,  # Added optional argument
         initial_field_values=initial_field_values,
+        # output_dir is not passed in legacy, HPR handles None
     )
     logger.info("Finished holographic phase retrieval.")
 
     if cfg.return_history:
-        cluster_coefficients, coefficient_history, field_history, stats = hpr_result
+        # Unpack results based on the new return signature (even if full_history is None)
+        cluster_coefficients, full_history, stats = hpr_result
+        # Extract legacy history variables if needed (and if history was returned)
+        coefficient_history = (
+            np.array([h["coefficients"] for h in full_history]) if full_history else None
+        )
+        # Field history is more complex now (segmented/test), maybe skip legacy field animation?
+        # For now, let's try reconstructing the full field history from segments if possible
+        # This assumes 'measured_plane' was the name used in train_plane_info
+        field_history = (
+            np.array([h["train_field_segments"]["measured_plane"] for h in full_history])
+            if full_history and "measured_plane" in full_history[0]["train_field_segments"]
+            else None
+        )
     else:
         cluster_coefficients, stats = hpr_result
 
     logger.info("Perturbation statistics:")
     logger.info(f"  Total iterations: {stats['iterations']}")
-    logger.info(f"  Final RMSE: {stats['final_rmse']:.6f}")
-    logger.info(f"  Best RMSE: {stats['best_rmse']:.6f}")
+    logger.info(f"  Final Overall RMSE: {stats['final_overall_rmse']:.6f}")  # Use correct key
+    logger.info(f"  Best Overall RMSE: {stats['best_overall_rmse']:.6f}")  # Use correct key
     logger.info(f"  Perturbations applied: {stats['num_perturbations']}")
 
     if stats["post_perturbation_tracking"]:
@@ -532,7 +552,7 @@ def main(cfg: DictConfig) -> None:
                 points,
                 H,
                 coefficient_history,  # Shape depends on model
-                field_history,
+                field_history if field_history is not None else [],  # Pass empty list if None
                 resolution_param,
                 measurement_plane,  # Added measurement_plane
                 show_plot=cfg.show_plot,
@@ -548,7 +568,7 @@ def main(cfg: DictConfig) -> None:
             visualize_current_and_field_history(
                 points,
                 coefficient_history,  # Shape depends on model
-                field_history,
+                field_history if field_history is not None else [],  # Pass empty list if None
                 true_field,
                 resolution_param,
                 measurement_plane,  # Added measurement_plane

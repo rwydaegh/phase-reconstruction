@@ -1,0 +1,68 @@
+# conf/integration_test_sim_train_test.yaml
+# Integration test: Train on one simulated plane, test on another.
+
+defaults:
+  - _self_
+
+# Top-level control
+legacy_mode: false
+
+# Global parameters (minimal for testing)
+global_params:
+  wavelength: 0.01 # Simplified
+  use_vector_model: false # Scalar for simplicity
+  measurement_direction: [1.0, 0.0, 0.0]
+  random_seed: 123
+  gs_iterations: 10 # Low iterations
+  convergence_threshold: 1e-2 # Relaxed threshold
+  regularization: 1e-4
+  adaptive_regularization: false
+  return_history: false # Don't need history for basic integration test
+  verbose: false
+  perturbation_mode: "none"
+  enable_perturbations: false
+  show_plot: false
+  no_plot: true # Disable plots for faster testing
+  no_anim: true # Disable animations
+
+# Source Point Cloud Configuration (Generated cube)
+source_pointcloud:
+  use_source_file: false # Generate test cloud
+  room_size: 1.0 # Smaller room
+  wall_points: 5 # Fewer points
+  perturb_points: false # No geometry perturbation
+  num_sources: 20 # Fewer sources
+  amplitude_sigma: 1.0
+
+# List of Measurement Planes
+measurement_planes:
+  # Plane 1: Training Only (Simulated XY plane at z = 0.4m)
+  - name: "sim_xy_train"
+    is_real_plane: false
+    use_train: true
+    use_test: false
+    translation: [0.0, 0.0, 0.4]
+    plane_type: 'xy'
+    center: [0.0, 0.0, 0.0]
+    size: [0.5, 0.5] # Smaller size
+    resolution: 15   # Low resolution
+
+  # Plane 2: Testing Only (Simulated XY plane at z = 0.6m)
+  - name: "sim_xy_test"
+    is_real_plane: false
+    use_train: false
+    use_test: true
+    translation: [0.0, 0.0, 0.6]
+    plane_type: 'xy'
+    center: [0.0, 0.0, 0.0]
+    size: [0.5, 0.5] # Smaller size
+    resolution: 15   # Low resolution
+    # No visualization section needed as no_anim is true globally
+
+# Hydra specific config for output directories
+hydra:
+  run:
+    dir: outputs/integration_tests/sim_train_test/${now:%Y-%m-%d_%H-%M-%S}
+  sweep:
+    dir: multirun/integration_tests/sim_train_test/${now:%Y-%m-%d_%H-%M-%S}
+    subdir: ${hydra.job.num}

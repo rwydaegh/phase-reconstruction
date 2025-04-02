@@ -33,6 +33,7 @@ global_params:
   show_plot: false
   no_plot: false
   no_anim: false
+  animate_grid_comparison: false # Generate single animation with grid of plane comparisons
   # Post-processing
   enable_smoothing: false
   smoothing_radius_mm: 10.0
@@ -63,6 +64,8 @@ measurement_planes:
     translation: [0.0, 0.0, 0.0] # meters, relative offset from its original position
     measured_data_path: "measurement_data/x400_zy.pickle"
     target_resolution: 50 # Sample down to this approximate resolution
+    visualization:
+      animate_comparison: true # Default: true because use_test is true
 
   # Example 2: Simulated Plane (Testing Only)
   - name: "sim_xy_center_test"
@@ -74,6 +77,8 @@ measurement_planes:
     center: [0.0, 0.0, 0.0] # Center before translation
     size: [1.0, 1.0] # Width, Height in meters
     resolution: 50
+    visualization:
+      animate_comparison: true # Default: true because use_test is true
 
   # Example 3: Real Measurement Plane (Training Only)
   - name: "real_y200_train_only"
@@ -83,6 +88,8 @@ measurement_planes:
     translation: [0.0, 0.0, 0.0]
     measured_data_path: "measurement_data/y200_zx.pickle"
     target_resolution: 50
+    visualization:
+      animate_comparison: false # Default: false because use_test is false
 
 # Hydra specific config for output directories
 hydra:

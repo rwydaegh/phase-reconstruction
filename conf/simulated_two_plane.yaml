@@ -10,11 +10,11 @@ legacy_mode: false
 # Global parameters (based on simulated_data.yaml where applicable)
 global_params:
   wavelength: 10.7e-3
-  use_vector_model: false
+  use_vector_model: true
   measurement_direction: [1.0, 0.0, 0.0]
   random_seed: 42
   # GS Algorithm Parameters
-  gs_iterations: 200
+  gs_iterations: 200 # Reduced for testing
   convergence_threshold: 1e-3
   regularization: 1e-3
   adaptive_regularization: true
@@ -33,6 +33,7 @@ global_params:
   show_plot: false
   no_plot: false
   no_anim: false
+  animate_grid_comparison: true # Enable grid animation
   # Post-processing (Disabled like simulated_data.yaml)
   enable_smoothing: false
   smoothing_radius_mm: 0.0
@@ -50,8 +51,8 @@ source_pointcloud:
   perturb_points: false
   perturbation_factor: 0.05
   # Source current generation
-  num_sources: 100
-  amplitude_sigma: 3.0
+  num_sources: 5
+  amplitude_sigma: 1.0
 
 # List of Measurement Planes
 measurement_planes:
@@ -64,19 +65,21 @@ measurement_planes:
     plane_type: 'xy'
     center: [0.0, 0.0, 0.0] # Center before translation
     size: [1.0, 1.0] # Width, Height in meters
-    resolution: 50   # Match simulated_data.yaml
-
+    resolution: 50   # Reduced for testing
+    visualization:
+      animate_comparison: true # Ensure comparison enabled
   # Plane 2: Simulated XY plane at z = 0.8m (Parallel to Plane 1)
   - name: "sim_xy_z0.8"
     is_real_plane: false
-    use_train: true # Use for training
+    use_train: false # Use for training
     use_test: true  # Use for testing
     translation: [0.0, 0.0, 0.8] # meters, offset from origin
     plane_type: 'xy'
     center: [0.0, 0.0, 0.0] # Center before translation
     size: [1.0, 1.0] # Width, Height in meters
-    resolution: 50   # Match simulated_data.yaml
-
+    resolution: 50   # Reduced for testing
+    visualization:
+      animate_comparison: true # Ensure comparison enabled
 # Hydra specific config for output directories
 hydra:
   run:

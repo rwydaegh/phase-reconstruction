@@ -100,7 +100,7 @@ def visualize_comparison(
 
     # Plot true field with normalized colorbar
     im1 = axes[0].imshow(
-        true_mag, cmap="viridis", origin="lower", extent=extent, vmin=global_min, vmax=global_max
+        true_mag, cmap="jet", origin="lower", extent=extent, vmin=global_min, vmax=global_max
     )
     axes[0].set_title(f"True Field ({plane_type} Plane)")
     axes[0].set_xlabel(horizontal_label)
@@ -109,7 +109,7 @@ def visualize_comparison(
 
     # Plot reconstructed field with normalized colorbar
     im2 = axes[1].imshow(
-        recon_mag, cmap="viridis", origin="lower", extent=extent, vmin=global_min, vmax=global_max
+        recon_mag, cmap="jet", origin="lower", extent=extent, vmin=global_min, vmax=global_max
     )
     axes[1].set_title(f"Reconstructed Field ({plane_type} Plane)")
     axes[1].set_xlabel(horizontal_label)
@@ -117,7 +117,7 @@ def visualize_comparison(
     plt.colorbar(im2, ax=axes[1], label="Field Magnitude")
 
     # Plot error
-    im3 = axes[2].imshow(error, cmap="hot", origin="lower", extent=extent)
+    im3 = axes[2].imshow(error, cmap="jet", origin="lower", extent=extent)
     axes[2].set_title(f"Error ({plane_type} Plane)")
     axes[2].set_xlabel(horizontal_label)
     axes[2].set_ylabel(vertical_label)
