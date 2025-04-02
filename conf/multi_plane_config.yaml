@@ -1,0 +1,100 @@
+# conf/multi_plane_config.yaml
+# New configuration structure for multi-plane reconstruction
+
+defaults:
+  - _self_ # Recommended for config composition
+
+# Top-level control
+legacy_mode: false # Set to true to use old measured_data.yaml or simulated_data.yaml structure
+
+# Global parameters (examples, adjust as needed)
+global_params:
+  wavelength: 10.7e-3  # 28GHz wavelength in meters
+  use_vector_model: false # Switch between scalar (False) and vector (True) field model
+  measurement_direction: [1.0, 0.0, 0.0] # Direction vector for vector model
+  random_seed: 42
+  # GS Algorithm Parameters
+  gs_iterations: 200
+  convergence_threshold: 1e-3
+  regularization: 1e-3
+  adaptive_regularization: true
+  return_history: true # Needed for animations/detailed analysis
+  verbose: false
+  # Perturbation Parameters (if enabled globally or per-plane)
+  perturbation_mode: "none" # "none", "basic", "momentum", "archived"
+  enable_perturbations: false # Derived from perturbation_mode != "none"
+  stagnation_window: 30
+  stagnation_threshold: 1e-3
+  perturbation_intensity: 0.8
+  constraint_skip_iterations: 3
+  momentum_factor: 0.8
+  temperature: 5.0
+  # Visualization Parameters
+  show_plot: false
+  no_plot: false
+  no_anim: false
+  animate_grid_comparison: false # Generate single animation with grid of plane comparisons
+  # Post-processing
+  enable_smoothing: false
+  smoothing_radius_mm: 10.0
+
+# Source Point Cloud Configuration
+source_pointcloud:
+  use_source_file: true # Whether to load from file or generate
+  source_file_path: "measurement_data/intersection_data.pkl" # Path if use_source_file is true
+  pointcloud_downsample: 1 # Downsample factor (1 = no downsampling)
+  max_distance_from_origin: -1 # Max distance filter (meters, -1 to disable)
+  # Parameters for generated cloud (if use_source_file is false)
+  room_size: 2.0
+  wall_points: 10
+  # Perturbation settings for the reconstruction geometry
+  perturb_points: false # Already false, no change needed here, but applying to be sure
+  perturbation_factor: 0.05 # Max perturbation as percentage of distance to origin
+  # Source current generation (applied to true geometry)
+  num_sources: 100
+  amplitude_sigma: 3.0
+
+# List of Measurement Planes
+measurement_planes:
+  # Example 1: Real Measurement Plane (Training & Testing)
+  - name: "real_x400_train_test"
+    is_real_plane: true
+    use_train: true
+    use_test: true
+    translation: [0.0, 0.0, 0.0] # meters, relative offset from its original position
+    measured_data_path: "measurement_data/x400_zy.pickle"
+    target_resolution: 50 # Sample down to this approximate resolution
+    visualization:
+      animate_comparison: true # Default: true because use_test is true
+
+  # Example 2: Simulated Plane (Testing Only)
+  - name: "sim_xy_center_test"
+    is_real_plane: false
+    use_train: false
+    use_test: true
+    translation: [0.0, 0.0, 0.5] # meters, offset from origin
+    plane_type: 'xy' # 'xy', 'yz', 'xz'
+    center: [0.0, 0.0, 0.0] # Center before translation
+    size: [1.0, 1.0] # Width, Height in meters
+    resolution: 50
+    visualization:
+      animate_comparison: true # Default: true because use_test is true
+
+  # Example 3: Real Measurement Plane (Training Only)
+  - name: "real_y200_train_only"
+    is_real_plane: true
+    use_train: true
+    use_test: false
+    translation: [0.0, 0.0, 0.0]
+    measured_data_path: "measurement_data/y200_zx.pickle"
+    target_resolution: 50
+    visualization:
+      animate_comparison: false # Default: false because use_test is false
+
+# Hydra specific config for output directories
+hydra:
+  run:
+    dir: outputs/multi_plane/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: multirun/multi_plane/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.num}

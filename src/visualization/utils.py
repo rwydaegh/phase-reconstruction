@@ -38,7 +38,7 @@ def visualize_field(
 
     fig, ax = plt.subplots(figsize=(8, 6))
     im = ax.imshow(
-        field_2d, cmap="viridis", origin="lower", extent=[x.min(), x.max(), y.min(), y.max()]
+        field_2d, cmap="jet", origin="lower", extent=[x.min(), x.max(), y.min(), y.max()]
     )
     plt.colorbar(im, ax=ax, label="Field Magnitude")
     ax.set_xlabel("X (m)")
@@ -90,7 +90,7 @@ def visualize_point_cloud(
 
     # Plot all points
     scatter = ax.scatter(
-        points[:, 0], points[:, 1], points[:, 2], c=colors, s=sizes, cmap="viridis", alpha=0.7
+        points[:, 0], points[:, 1], points[:, 2], c=colors, s=sizes, cmap="jet", alpha=0.7
     )
 
     # Highlight specific points if requested

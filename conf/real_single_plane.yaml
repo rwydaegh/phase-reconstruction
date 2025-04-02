@@ -1,0 +1,73 @@
+# conf/real_single_plane.yaml
+# Multi-plane config for a single real measurement plane scenario.
+
+defaults:
+  - _self_
+
+# Top-level control
+legacy_mode: false
+
+# Global parameters
+global_params:
+  wavelength: 10.7e-3 # Default from measured_data
+  use_vector_model: false # Keep scalar for simplicity unless specified otherwise
+  measurement_direction: [1.0, 0.0, 0.0]
+  random_seed: 999
+  # GS Algorithm Parameters
+  gs_iterations: 200
+  convergence_threshold: 1e-3
+  regularization: 1e-3
+  adaptive_regularization: true
+  return_history: true
+  verbose: false
+  # Perturbation Parameters
+  perturbation_mode: "none" # No GS perturbations needed for baseline
+  enable_perturbations: false
+  stagnation_window: 30
+  stagnation_threshold: 1e-3
+  perturbation_intensity: 0.8
+  constraint_skip_iterations: 3
+  momentum_factor: 0.8
+  temperature: 5.0
+  # Visualization Parameters
+  show_plot: false
+  no_plot: false
+  no_anim: false
+  # Post-processing
+  enable_smoothing: false # Keep false for baseline comparison
+  smoothing_radius_mm: 10.0
+
+# Source Point Cloud Configuration (Using real data)
+source_pointcloud:
+  use_source_file: true # Use the real point cloud file
+  source_file_path: "measurement_data/intersection_data.pkl"
+  pointcloud_downsample: 1 # No downsampling unless needed
+  max_distance_from_origin: -1 # No distance filter unless needed
+  translation: [-5.35211, -6.34833, -1.28819] # Apply the translation from legacy script
+  # Parameters below are not used when use_source_file is true
+  room_size: 2.0
+  wall_points: 10
+  # Perturbation settings
+  perturb_points: false # Crucial: Use true geometry
+  perturbation_factor: 0.05
+  # Source current generation (Not strictly needed as we use measured magnitude)
+  num_sources: 100
+  amplitude_sigma: 3.0
+
+# List of Measurement Planes (Only one real plane)
+measurement_planes:
+  - name: "real_x400_single"
+    is_real_plane: true
+    use_train: true # Use for training
+    use_test: true  # Use for testing
+    translation: [0.0, 0.0, 0.0] # No translation for baseline
+    measured_data_path: "measurement_data/x400_zy.pickle"
+    target_resolution: 50 # Sample down for reasonable runtime
+
+# Hydra specific config for output directories
+hydra:
+  run:
+    dir: outputs/real_single_plane/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: multirun/real_single_plane/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.num}

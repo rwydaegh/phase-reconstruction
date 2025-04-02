@@ -122,7 +122,7 @@ def visualize_fields(
         points[:, 2],
         c=current_mags_per_point,  # Use combined magnitude for color
         s=sizes,
-        cmap="plasma",
+        cmap="jet",
         alpha=alphas,
     )
 
@@ -181,7 +181,7 @@ def visualize_fields(
     # Plot 2: True field magnitude with normalized colorbar (top right)
     im1 = ax1.imshow(
         true_field_abs,
-        cmap="viridis",
+        cmap="jet",
         origin="lower",
         extent=extent,
         vmin=global_min,
@@ -195,7 +195,7 @@ def visualize_fields(
     # Plot 3: Measured field magnitude with normalized colorbar (bottom left)
     im2 = ax2.imshow(
         measured_magnitude_2d,
-        cmap="viridis",
+        cmap="jet",
         origin="lower",
         extent=extent,
         vmin=global_min,
@@ -209,7 +209,7 @@ def visualize_fields(
     # Plot 4: Reconstructed field magnitude with normalized colorbar (bottom right)
     im3 = ax3.imshow(
         reconstructed_field_abs,
-        cmap="viridis",
+        cmap="jet",
         origin="lower",
         extent=extent,
         vmin=global_min,

@@ -105,7 +105,7 @@ def visualize_iteration_history(
         global_max = max(global_max, np.max(measured_field_2d))  # Update global max
         im3 = ax3.imshow(
             measured_field_2d,
-            cmap="viridis",
+            cmap="jet",
             origin="lower",
             extent=extent,
             vmin=0,
@@ -119,7 +119,7 @@ def visualize_iteration_history(
         # If no measured data, show a placeholder
         im3 = ax3.imshow(
             np.zeros((resolution, resolution)),
-            cmap="viridis",
+            cmap="jet",
             origin="lower",
             extent=extent,
             vmin=0,
@@ -132,7 +132,7 @@ def visualize_iteration_history(
 
     # Setup for reconstructed field magnitude (second panel)
     im1 = ax1.imshow(
-        field_mag, cmap="viridis", origin="lower", extent=extent, vmin=0, vmax=global_max
+        field_mag, cmap="jet", origin="lower", extent=extent, vmin=0, vmax=global_max
     )  # Use consistent color scale
     ax1.set_title(f"Reconstructed Field ({plane_type} Plane)")
     ax1.set_xlabel(horizontal_label)
@@ -284,15 +284,30 @@ def visualize_iteration_history(
         fig, update, frames=len(selected_frames), interval=100, blit=True
     )  # Faster frame rate (100ms vs 200ms)
 
-    # Save animation if output file specified
-    if output_file:
+    # Save animation if animation_filename is provided
+    if animation_filename:
         # Use higher FPS for smoother, faster animation
         adjusted_fps = max(10, 30 // final_frame_skip)  # Higher base FPS (10-30 vs 5-15)
-        anim.save(animation_filename, writer="pillow", fps=adjusted_fps)
-        print(
-            f"Saved animation to {output_file} "
-            f"(skipping {final_frame_skip-1} frames, fps={adjusted_fps})"
+        try:
+            anim.save(animation_filename, writer="pillow", fps=adjusted_fps)
+            logger.info(
+                f"Saved GS iteration animation to {animation_filename} "
+                f"(skipping {final_frame_skip-1} frames, fps={adjusted_fps})"
+            )
+        except Exception as e:
+            logger.error(f"Failed to save GS iteration animation to {animation_filename}: {e}")
+    elif output_file:  # Fallback for old parameter name, though filename is preferred
+        logger.warning(
+            "Using deprecated 'output_file' parameter for animation filename. Use 'animation_filename' instead."
         )
+        adjusted_fps = max(10, 30 // final_frame_skip)
+        try:
+            anim.save(
+                output_file, writer="pillow", fps=adjusted_fps
+            )  # Assuming output_file is meant for the gif
+            logger.info(f"Saved GS iteration animation to {output_file}...")
+        except Exception as e:
+            logger.error(f"Failed to save GS iteration animation to {output_file}: {e}")
 
     # Show plot if requested
     if show_plot:
@@ -427,7 +442,7 @@ def visualize_current_and_field_history(
         points[:, 2],
         c=current_mags_per_point_0,  # Use combined magnitude for color
         s=sizes,
-        cmap="plasma",
+        cmap="jet",
         alpha=alphas,
     )
 
@@ -470,7 +485,7 @@ def visualize_current_and_field_history(
 
     # Initial 2D field magnitude plot (top right)
     im1 = ax2.imshow(
-        field_mag, cmap="viridis", origin="lower", extent=extent, vmin=0, vmax=global_max
+        field_mag, cmap="jet", origin="lower", extent=extent, vmin=0, vmax=global_max
     )  # Use consistent color scale
     ax2.set_title(f"Reconstructed Field Magnitude ({plane_type} Plane)")
     ax2.set_xlabel(horizontal_label)
@@ -479,7 +494,7 @@ def visualize_current_and_field_history(
 
     # True field magnitude plot (bottom left)
     im2 = ax3.imshow(
-        true_field_2d, cmap="viridis", origin="lower", extent=extent, vmin=0, vmax=global_max
+        true_field_2d, cmap="jet", origin="lower", extent=extent, vmin=0, vmax=global_max
     )  # Use consistent color scale
     ax3.set_title(f"True Field Magnitude ({plane_type} Plane)")
     ax3.set_xlabel(horizontal_label)
@@ -488,7 +503,7 @@ def visualize_current_and_field_history(
 
     # Initial error/difference plot (bottom right)
     error = np.abs(field_mag - true_field_2d)
-    im3 = ax4.imshow(error, cmap="hot", origin="lower", extent=extent)
+    im3 = ax4.imshow(error, cmap="jet", origin="lower", extent=extent)
     ax4.set_title(f"Error (Absolute Difference) ({plane_type} Plane)")
     ax4.set_xlabel(horizontal_label)
     ax4.set_ylabel(vertical_label)
@@ -579,7 +594,7 @@ def visualize_current_and_field_history(
             points[:, 2],
             c=current_mags_per_point_i,  # Use combined magnitude for color
             s=sizes,
-            cmap="plasma",
+            cmap="jet",
             alpha=alphas,
         )
 
@@ -635,14 +650,30 @@ def visualize_current_and_field_history(
 
     plt.tight_layout()
 
-    # Save animation if output file specified
-    if output_file:
+    # Save animation if animation_filename is provided
+    if animation_filename:
         # Adjust FPS proportionally to maintain similar animation duration
-        adjusted_fps = max(5, 15 // frame_skip)
-        anim.save(animation_filename, writer="pillow", fps=adjusted_fps)
-        print(
-            f"Saved animation to {output_file} (skipping {frame_skip-1} frames, fps={adjusted_fps})"
+        adjusted_fps = max(5, 15 // final_frame_skip)  # Use final_frame_skip here too
+        try:
+            anim.save(animation_filename, writer="pillow", fps=adjusted_fps)
+            logger.info(
+                f"Saved current/field animation to {animation_filename} "
+                f"(skipping {final_frame_skip-1} frames, fps={adjusted_fps})"
+            )
+        except Exception as e:
+            logger.error(f"Failed to save current/field animation to {animation_filename}: {e}")
+    elif output_file:  # Fallback for old parameter name
+        logger.warning(
+            "Using deprecated 'output_file' parameter for animation filename. Use 'animation_filename' instead."
         )
+        adjusted_fps = max(5, 15 // final_frame_skip)
+        try:
+            anim.save(
+                output_file, writer="pillow", fps=adjusted_fps
+            )  # Assuming output_file is meant for the gif
+            logger.info(f"Saved current/field animation to {output_file}...")
+        except Exception as e:
+            logger.error(f"Failed to save current/field animation to {output_file}: {e}")
 
     # Show plot if requested
     if show_plot:

@@ -1,6 +1,6 @@
 import logging
 import sys
-from typing import Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 from omegaconf import DictConfig  # Import DictConfig
@@ -20,42 +20,75 @@ from src.utils.phase_retrieval_utils import (
 logger = logging.getLogger(__name__)
 
 
-def holographic_phase_retrieval(
-    cfg: DictConfig,  # Use cfg object
-    channel_matrix: np.ndarray,
-    measured_magnitude: np.ndarray,
+def holographic_phase_retrieval(  # noqa C901 TODO: Refactor this function for complexity
+    cfg: DictConfig,
+    channel_matrix: np.ndarray,  # Combined H_train
+    measured_magnitude: np.ndarray,  # Combined Mag_train
+    train_plane_info: List[
+        Tuple[str, int, int]
+    ],  # List of (name, start_row, end_row) for training planes
+    # Add arguments for test plane data needed for history/animations
+    test_planes_data: Optional[
+        Dict[str, Dict]
+    ] = None,  # Dict mapping test_plane_name to {'H': H_test, 'coords': coords, ...}
+    points_perturbed: Optional[
+        np.ndarray
+    ] = None,  # Needed if calculating H_test inside? No, pass H_test.
+    k: Optional[float] = None,  # Needed if calculating H_test inside? No, pass H_test.
     initial_field_values: Optional[np.ndarray] = None,
-    output_dir: Optional[str] = None,  # Add output directory parameter
-):
+    output_dir: Optional[str] = None,
+) -> Tuple[np.ndarray, Any]:  # Return type adjusted below
     """
-    Basic holographic phase retrieval algorithm based on Gerchberg-Saxton with
-    optional simple perturbation strategies.
+    Holographic phase retrieval using Gerchberg-Saxton with enhancements.
+
+    Optimizes cluster coefficients based on the combined magnitude measurements
+    from one or more training planes. Optionally tracks history and calculates
+    per-plane training errors.
 
     Args:
-        cfg: Configuration object containing parameters like:
-            gs_iterations: Maximum number of iterations
-            convergence_threshold: Convergence criterion
-            regularization: Regularization parameter for SVD
-            adaptive_regularization: Whether to use adaptive regularization
-            return_history: Whether to return the history of cluster coefficients
-            verbose: Whether to print verbose information
-            enable_perturbations: Whether to enable perturbation strategies
-            stagnation_window: Number of iterations to detect stagnation
-            stagnation_threshold: Error improvement threshold to detect stagnation
-            perturbation_mode: Which perturbation strategy to use
-            perturbation_intensity: Intensity of perturbations (relative to field norm)
-            constraint_skip_iterations: How many iterations to skip the constraint
-                                        after perturbation
-            momentum_factor: Weight factor for momentum-based perturbation
-            temperature: Temperature parameter for archived strategies
-            no_plot: Whether to create convergence plots
-        channel_matrix: Matrix H relating clusters to measurement points.
-        measured_magnitude: Measured field magnitude.
-        initial_field_values: Optional custom field initialization.
-        output_dir: Optional directory to save plots like the convergence plot.
+        cfg: Hydra configuration object (typically cfg.global_params).
+             Contains algorithm settings (iterations, regularization, perturbations, etc.).
+        channel_matrix: Combined channel matrix (H_train) for all training planes,
+                        shape (N_m_total, N_coeffs).
+        measured_magnitude: Combined measured field magnitude for all training planes,
+                            shape (N_m_total,).
+        train_plane_info: List of tuples `(name, start_row, end_row)` indicating the row
+                          slices in `channel_matrix` and `measured_magnitude` for each training plane.
+        test_planes_data: Optional dictionary mapping test plane names to their data dicts.
+                          Each data dict should contain at least the pre-computed channel matrix
+                          `'H_test'` for that plane (calculated using perturbed points).
+                          Needed only if `cfg.return_history` is True for animations.
+        points_perturbed: Perturbed source points (needed only if H_test is calculated inside, deprecated).
+        k: Wavenumber (needed only if H_test is calculated inside, deprecated).
+        initial_field_values: Optional initial guess for the complex field values on the
+                              combined measurement plane, shape (N_m_total,).
+        output_dir: Optional directory to save convergence plots.
 
     Returns:
-        Cluster coefficients and optionally history, along with stats.
+        Tuple containing:
+            - final_coefficients (np.ndarray): The optimized cluster coefficients.
+            - full_history (Optional[List[Dict]]): If cfg.return_history is True, a list where
+              each element is a dictionary containing data for that iteration:
+              {
+                  'iteration': int,
+                  'coefficients': np.ndarray,
+                  'train_field_segments': Dict[str, np.ndarray], # Complex fields on train planes
+                  'test_fields': Dict[str, np.ndarray],       # Complex fields on test planes
+                  'overall_train_rmse': float,
+                  'per_train_plane_rmse': Dict[str, float]
+              }
+              Otherwise None.
+            - stats (Dict): Dictionary containing final metrics (RMSEs), convergence info,
+              perturbation tracking, and potentially aggregated history lists like
+              'overall_rmse_history' and 'per_train_plane_rmse_history'.
+
+        Return signature if cfg.return_history:
+            (final_coefficients, full_history, stats)
+        Return signature if not cfg.return_history:
+            (final_coefficients, stats)
+
+    Raises:
+        ValueError: If input shapes are inconsistent.
     """
     # Convert to fortran-order arrays for better matrix multiplication performance
     measured_magnitude = np.asfortranarray(measured_magnitude)
@@ -71,13 +104,18 @@ def holographic_phase_retrieval(
         field_values = initialize_field_values(measured_magnitude)
 
     # Initialize RMSE tracking
-    rmse_history = []
+    # Initialize overall RMSE tracking
+    overall_rmse_history = []
     best_coefficients = None
-    best_rmse = float("inf")
+    best_overall_rmse = float("inf")
 
-    # Initialize history arrays if needed
-    coefficient_history = [] if cfg.return_history else None
-    field_history = [] if cfg.return_history else None
+    # Initialize per-plane RMSE tracking
+    per_train_plane_rmse_history: Dict[str, List[float]] = {
+        name: [] for name, _, _ in train_plane_info
+    }
+
+    # Initialize detailed history list if needed
+    full_history: Optional[List[Dict]] = [] if cfg.return_history else None
 
     # measured_magnitude_norm = np.linalg.norm(measured_magnitude) # No longer needed for error calc
 
@@ -125,15 +163,61 @@ def holographic_phase_retrieval(
         # 2. Forward transform from clusters to field
         simulated_field = channel_matrix @ cluster_coefficients
 
-        if cfg.return_history:
-            coefficient_history.append(cluster_coefficients.copy())
-            field_history.append(simulated_field.copy())
-
-        # 3. Calculate current metrics (RMSE and Correlation)
+        # --- Calculate current metrics (RMSE and Correlation) --- # Moved calculation before history storage
         simulated_magnitude = np.abs(simulated_field)
         rmse = normalized_rmse(simulated_magnitude, measured_magnitude)
         corr = normalized_correlation(simulated_magnitude, measured_magnitude)
-        rmse_history.append(rmse)
+        overall_rmse_history.append(rmse)
+
+        # Calculate and store per-plane RMSE
+        per_plane_rmse_this_iter = {}  # Store temporarily for history entry
+        for name, start_row, end_row in train_plane_info:
+            plane_sim_mag = simulated_magnitude[start_row:end_row]
+            plane_meas_mag = measured_magnitude[start_row:end_row]
+            plane_rmse = normalized_rmse(plane_sim_mag, plane_meas_mag)
+            per_train_plane_rmse_history[name].append(plane_rmse)
+            per_plane_rmse_this_iter[name] = plane_rmse  # Store for history dict
+
+        # --- Store detailed history if requested ---
+        if full_history is not None:
+            history_entry: Dict[str, Any] = {
+                "iteration": i,
+                "coefficients": cluster_coefficients.copy(),
+                "train_field_segments": {},  # Populated below
+                "test_fields": {},
+                "overall_train_rmse": rmse,
+                "per_train_plane_rmse": {},
+            }
+
+            # Store segmented training fields and per-plane RMSEs
+            for name, start_row, end_row in train_plane_info:
+                history_entry["train_field_segments"][name] = simulated_field[
+                    start_row:end_row
+                ].copy()
+                # Get the already calculated per-plane RMSE for this iteration
+                history_entry["per_train_plane_rmse"][name] = per_train_plane_rmse_history[name][-1]
+
+            # Calculate and store reconstructed fields on test planes
+            if test_planes_data:
+                for test_name, test_data in test_planes_data.items():
+                    H_test = test_data.get("H_test")
+                    if H_test is not None:
+                        # Ensure H_test columns match coefficients length
+                        if H_test.shape[1] == cluster_coefficients.shape[0]:
+                            recon_field_test = H_test @ cluster_coefficients
+                            history_entry["test_fields"][test_name] = recon_field_test.copy()
+                        else:
+                            logger.warning(
+                                f"Iter {i}: Skipping test field calculation for '{test_name}' due to H shape mismatch "
+                                f"(H: {H_test.shape[1]}, coeffs: {cluster_coefficients.shape[0]})"
+                            )
+                    else:
+                        logger.warning(
+                            f"Iter {i}: Skipping test field calculation for '{test_name}', H_test not found in test_planes_data."
+                        )
+
+            full_history.append(history_entry)
+        # --- End History Storage ---
 
         # Print metrics for every iteration
         if cfg.verbose:
@@ -146,19 +230,31 @@ def holographic_phase_retrieval(
             sys.stdout.flush()  # Ensure it's written immediately
 
         # Save best coefficients
-        if rmse < best_rmse:
-            best_rmse = rmse
+        # Save best coefficients based on overall RMSE
+        if rmse < best_overall_rmse:
+            best_overall_rmse = rmse
             best_coefficients = cluster_coefficients.copy()
 
-            # Check if this is a significant improvement
-            improvement = rmse_history[last_significant_improvement] - rmse
-            if i > 0 and improvement > cfg.stagnation_threshold:
+            # Check if this is a significant improvement (only relevant if perturbations are enabled)
+            if cfg.enable_perturbations and i > 0:
+                improvement = overall_rmse_history[last_significant_improvement] - rmse
+                if improvement > cfg.stagnation_threshold:
+                    last_significant_improvement = i
+            elif (
+                i > 0
+            ):  # If perturbations disabled, still update best_coefficients if RMSE improves
+                # No need to check threshold, just track the best
+                pass  # Logic for updating best_coefficients already exists above
+
+            # The rest of the improvement tracking logic (for stats) should also be under the enable_perturbations check
+            if cfg.enable_perturbations and i > 0 and improvement > cfg.stagnation_threshold:
                 last_significant_improvement = i
 
                 # If we're tracking post-perturbation progress, update with success
                 if (
                     current_tracking is not None
-                    and i - current_tracking["start_iter"] <= cfg.stagnation_window
+                    and i - current_tracking["start_iter"]
+                    <= cfg.stagnation_window  # This access is safe as current_tracking only exists if perturbations enabled
                 ):
                     # Use RMSE for tracking improvement
                     current_tracking["final_rmse"] = rmse
@@ -199,95 +295,72 @@ def holographic_phase_retrieval(
         ):
             # We're stagnating - apply perturbation based on selected mode
             if cfg.perturbation_mode == "none":
-                # Skip perturbation
+                # Skip perturbation, but maybe reset stagnation counter anyway?
+                # Or let it keep checking? For now, do nothing.
                 pass
             elif cfg.perturbation_mode == "basic":
                 # Simple random perturbation
                 field_values = apply_basic_perturbation(field_values, i, cfg.perturbation_intensity)
                 perturbation_iterations.append(i)
-
-                # Start tracking post-perturbation progress
-                current_tracking = {
+                current_tracking = {  # Start tracking post-perturbation progress
                     "start_iter": i,
-                    "start_rmse": rmse,  # Track starting RMSE
-                    # Initialize with current rmse
-                    # F821: error undefined, use rmse
+                    "start_rmse": rmse,
                     "final_rmse": rmse,
                     "improvement": 0.0,
                     "success": False,
                     "perturbation_type": "basic",
                 }
-
-                # Reset stagnation counter
-                last_significant_improvement = i
-
-                # Set the constraint skip counter
-                skip_constraint_counter = cfg.constraint_skip_iterations
-
+                last_significant_improvement = i  # Reset stagnation counter
+                skip_constraint_counter = cfg.constraint_skip_iterations  # Set constraint skip
             elif cfg.perturbation_mode == "momentum":
                 # Momentum-based perturbation
                 field_values, previous_momentum = apply_momentum_perturbation(
                     field_values,
-                    rmse,  # Pass current rmse as the error metric # F821: error undefined, use rmse
+                    rmse,
                     previous_momentum,
                     i,
                     cfg.perturbation_intensity,
                     cfg.momentum_factor,
                 )
                 perturbation_iterations.append(i)
-
-                # Start tracking post-perturbation progress
-                current_tracking = {
+                current_tracking = {  # Start tracking
                     "start_iter": i,
-                    "start_rmse": rmse,  # Track starting RMSE
-                    # Initialize with current rmse
-                    # F821: error undefined, use rmse
+                    "start_rmse": rmse,
                     "final_rmse": rmse,
                     "improvement": 0.0,
                     "success": False,
                     "perturbation_type": "momentum",
                 }
-
-                # Reset stagnation counter
                 last_significant_improvement = i
-
-                # Set the constraint skip counter
                 skip_constraint_counter = cfg.constraint_skip_iterations
-
             elif cfg.perturbation_mode == "archived":
-                # Use the archived complex strategies (via separate function)
+                # Use the archived complex strategies
                 field_values = apply_archived_complex_strategies(
                     field_values,
                     cluster_coefficients,
-                    rmse,  # Pass current rmse as the error metric # F821: error undefined, use rmse
+                    rmse,
                     i,
                     cfg.perturbation_intensity,
                     cfg.temperature,
                 )
                 perturbation_iterations.append(i)
-
-                # Start tracking post-perturbation progress
-                current_tracking = {
+                current_tracking = {  # Start tracking
                     "start_iter": i,
-                    "start_rmse": rmse,  # Track starting RMSE
-                    # Initialize with current rmse
-                    # F821: error undefined, use rmse
+                    "start_rmse": rmse,
                     "final_rmse": rmse,
                     "improvement": 0.0,
                     "success": False,
                     "perturbation_type": "archived",
                 }
-
-                # Reset stagnation counter
                 last_significant_improvement = i
-
-                # Set the constraint skip counter
                 skip_constraint_counter = cfg.constraint_skip_iterations
 
         # If we're tracking post-perturbation progress and hit the end of tracking window
         is_tracking = current_tracking is not None
         tracking_window_elapsed = (
-            i - current_tracking["start_iter"] >= cfg.stagnation_window if is_tracking else False
+            i - current_tracking["start_iter"] >= cfg.stagnation_window
+            if is_tracking
+            else False  # Safe access
         )
         if is_tracking and tracking_window_elapsed:
             current_tracking["final_rmse"] = rmse
@@ -304,15 +377,17 @@ def holographic_phase_retrieval(
 
     # Create convergence plot if output directory is provided
     if not cfg.no_plot and output_dir:
+        # Pass overall RMSE history to the convergence plot function
         create_convergence_plot(
-            rmse_history, perturbation_iterations, [], cfg.convergence_threshold, output_dir
+            overall_rmse_history, perturbation_iterations, [], cfg.convergence_threshold, output_dir
         )
+        # TODO: Consider enhancing create_convergence_plot to optionally show per-plane errors
 
     # Use the best coefficients found
-    if best_rmse < rmse:
+    if best_overall_rmse < rmse:
         if cfg.verbose:
             logger.info(
-                f"Using best coefficients with RMSE {best_rmse:.6f} "
+                f"Using best coefficients with overall RMSE {best_overall_rmse:.6f} "
                 f"instead of final RMSE {rmse:.6f}"
             )
         final_coefficients = best_coefficients
@@ -321,21 +396,21 @@ def holographic_phase_retrieval(
 
     # Prepare statistics about perturbation effectiveness
     stats = {
-        "iterations": i + 1,
-        "final_rmse": rmse,  # Use RMSE
-        "best_rmse": best_rmse,  # Use RMSE
+        "iterations": i + 1,  # Use i+1 as loop might break early
+        "final_overall_rmse": rmse,
+        "best_overall_rmse": best_overall_rmse,
         "num_perturbations": len(perturbation_iterations),
         "perturbation_iterations": perturbation_iterations,
-        # Note: tracking dict now uses 'start_rmse', 'final_rmse'
         "post_perturbation_tracking": post_perturbation_tracking,
-        "rmse_history": rmse_history,  # Use RMSE
+        "overall_rmse_history": overall_rmse_history,
+        "per_train_plane_rmse_history": per_train_plane_rmse_history,  # Add per-plane history
     }
 
     if cfg.verbose:
         logger.info(
             f"GS algorithm completed: {i+1} iterations, "
             f"{len(perturbation_iterations)} perturbations, "
-            f"best RMSE: {best_rmse:.6f}"
+            f"best overall RMSE: {best_overall_rmse:.6f}"
         )
 
         # Report on perturbation effectiveness
@@ -352,7 +427,15 @@ def holographic_phase_retrieval(
                 f"Average improvement: {avg_improvement:.6f}"
             )
 
+    # Adjust return value based on history flag
     if cfg.return_history:
-        return final_coefficients, np.array(coefficient_history), np.array(field_history), stats
+        # Add aggregated histories to stats for convenience (e.g., for convergence plot)
+        stats["overall_rmse_history"] = overall_rmse_history
+        stats["per_train_plane_rmse_history"] = per_train_plane_rmse_history
+        return final_coefficients, full_history, stats
     else:
+        # Add aggregated histories to stats even if full_history isn't returned
+        stats["overall_rmse_history"] = overall_rmse_history
+        stats["per_train_plane_rmse_history"] = per_train_plane_rmse_history
+
         return final_coefficients, stats

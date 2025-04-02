@@ -1,0 +1,80 @@
+# conf/real_train_test_separate.yaml
+# Train on x400_zy, Test on x0_zy
+
+defaults:
+  - _self_
+
+# Top-level control
+legacy_mode: false
+
+# Global parameters
+global_params:
+  wavelength: 10.7e-3
+  use_vector_model: false
+  measurement_direction: [1.0, 0.0, 0.0]
+  random_seed: 42 # Set seed back to 42
+  # GS Algorithm Parameters
+  gs_iterations: 200
+  convergence_threshold: 1e-3
+  regularization: 1e-3
+  adaptive_regularization: true
+  return_history: true
+  verbose: false
+  # Perturbation Parameters
+  perturbation_mode: "none"
+  enable_perturbations: false
+  stagnation_window: 30
+  stagnation_threshold: 1e-3
+  perturbation_intensity: 0.8
+  constraint_skip_iterations: 3
+  momentum_factor: 0.8
+  temperature: 5.0
+  # Visualization Parameters
+  show_plot: false
+  no_plot: false
+  no_anim: false
+  # Post-processing
+  enable_smoothing: false
+  smoothing_radius_mm: 10.0
+
+# Source Point Cloud Configuration (Using real data with translation)
+source_pointcloud:
+  use_source_file: true
+  source_file_path: "measurement_data/intersection_data.pkl"
+  pointcloud_downsample: 4
+  max_distance_from_origin: -1
+  translation: [-5.35211, -6.34833, -1.28819] # Apply the translation
+  # Perturbation settings
+  perturb_points: false # Use true geometry
+  perturbation_factor: 0.05
+  # Source current generation (Not strictly needed as we use measured magnitude for training)
+  num_sources: 100
+  amplitude_sigma: 3.0
+
+# List of Measurement Planes
+measurement_planes:
+  # Plane 1: Train only
+  - name: "real_x400_train"
+    is_real_plane: true
+    use_train: true # <<< Use for training
+    use_test: false # <<< Do NOT use for testing
+    translation: [0.0, 0.0, 0.0]
+    measured_data_path: "measurement_data/x400_zy.pickle"
+    target_resolution: 149
+
+  # Plane 2: Test only
+  - name: "real_x0_test"
+    is_real_plane: true
+    use_train: false # <<< Do NOT use for training
+    use_test: true  # <<< Use for testing
+    translation: [0.0, 0.0, 0.0]
+    measured_data_path: "measurement_data/x0_zy.pickle"
+    target_resolution: 149
+
+# Hydra specific config for output directories
+hydra:
+  run:
+    dir: outputs/real_train_test_separate/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: multirun/real_train_test_separate/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.num}

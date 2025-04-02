@@ -1,5 +1,3 @@
-# conf/fake_data.yaml
-
 # Default configuration for simulated_data_reconstruction.py (using simulated data)
 
 # Inherit from the base config.yaml, overriding specific values
@@ -10,9 +8,10 @@ defaults:
 # Override parameters for simulated data simulation
 resolution: 50
 use_source_pointcloud: False # Override to disable source point cloud for simulated data
-perturb_points: True          # Enable point cloud perturbation
+use_vector_model: True       # Set to True for vector mode comparison
+perturb_points: False         # Disable point cloud perturbation for comparison
 perturbation_factor: 0.05
-perturbation_mode: "basic" # Original default for simulated data
+perturbation_mode: "basic" # Match replica config for comparison
 enable_perturbations: False # Original default for simulated data
 stagnation_threshold: 1e-3 # Original default for simulated data
 enable_smoothing: False

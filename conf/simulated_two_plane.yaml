@@ -1,0 +1,89 @@
+# conf/simulated_two_plane.yaml
+# Multi-plane config for a simulated scenario with two parallel planes.
+
+defaults:
+  - _self_
+
+# Top-level control
+legacy_mode: false
+
+# Global parameters (based on simulated_data.yaml where applicable)
+global_params:
+  wavelength: 10.7e-3
+  use_vector_model: true
+  measurement_direction: [1.0, 0.0, 0.0]
+  random_seed: 42
+  # GS Algorithm Parameters
+  gs_iterations: 200 # Reduced for testing
+  convergence_threshold: 1e-3
+  regularization: 1e-3
+  adaptive_regularization: true
+  return_history: true
+  verbose: false
+  # Perturbation Parameters (Enabled like simulated_data.yaml)
+  perturbation_mode: "basic" # Example, adjust if needed
+  enable_perturbations: true # Derived from mode != none
+  stagnation_window: 30
+  stagnation_threshold: 1e-3
+  perturbation_intensity: 0.8
+  constraint_skip_iterations: 3
+  momentum_factor: 0.8
+  temperature: 5.0
+  # Visualization Parameters
+  show_plot: false
+  no_plot: false
+  no_anim: false
+  animate_grid_comparison: true # Enable grid animation
+  # Post-processing (Disabled like simulated_data.yaml)
+  enable_smoothing: false
+  smoothing_radius_mm: 0.0
+
+# Source Point Cloud Configuration (Generated cube, perturbed)
+source_pointcloud:
+  use_source_file: false # Generate test cloud
+  source_file_path: null # Not used
+  pointcloud_downsample: 1
+  max_distance_from_origin: -1
+  # Parameters for generated cloud
+  room_size: 2.0
+  wall_points: 10
+  # Perturbation settings (Enabled like simulated_data.yaml)
+  perturb_points: false
+  perturbation_factor: 0.05
+  # Source current generation
+  num_sources: 5
+  amplitude_sigma: 1.0
+
+# List of Measurement Planes
+measurement_planes:
+  # Plane 1: Simulated XY plane at z = 0.5m
+  - name: "sim_xy_z0.5"
+    is_real_plane: false
+    use_train: true # Use for training
+    use_test: true  # Use for testing
+    translation: [0.0, 0.0, 0.5] # meters, offset from origin
+    plane_type: 'xy'
+    center: [0.0, 0.0, 0.0] # Center before translation
+    size: [1.0, 1.0] # Width, Height in meters
+    resolution: 50   # Reduced for testing
+    visualization:
+      animate_comparison: true # Ensure comparison enabled
+  # Plane 2: Simulated XY plane at z = 0.8m (Parallel to Plane 1)
+  - name: "sim_xy_z0.8"
+    is_real_plane: false
+    use_train: false # Use for training
+    use_test: true  # Use for testing
+    translation: [0.0, 0.0, 0.8] # meters, offset from origin
+    plane_type: 'xy'
+    center: [0.0, 0.0, 0.0] # Center before translation
+    size: [1.0, 1.0] # Width, Height in meters
+    resolution: 50   # Reduced for testing
+    visualization:
+      animate_comparison: true # Ensure comparison enabled
+# Hydra specific config for output directories
+hydra:
+  run:
+    dir: outputs/simulated_two_plane/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: multirun/simulated_two_plane/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.num}
